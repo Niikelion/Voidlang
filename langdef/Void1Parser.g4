@@ -3,10 +3,12 @@ options {
     tokenVocab = Void1Lexer;
 }
 
-numericLiteral: DecimalLiteral | HexadecimalLiteral;
+numericLiteral: DecimalNumber | HexadecimalNumber;
 
-valueExpression: numericLiteral;
+stringLiteral: SimpleString;
 
-valueSeq: valueExpression | (valueExpression Separator valueSeq);
+valueExpression: numericLiteral | stringLiteral;
+
+valueSeq: valueExpression | (valueExpression Separator valueSeq) | Separator;
 
 input: valueSeq? EOF;
