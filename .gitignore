@@ -33,3 +33,6 @@
 
 .vs
 build
+
+langdef/.antlr
+langdef/out
