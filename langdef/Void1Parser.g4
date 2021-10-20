@@ -52,7 +52,8 @@ unionDefinition: Union Name unionScope;
 
 usingDefinition: Using Name Assignment typeName ExpressionSeparator;
 
-preprocesorInstruction: expressionScope;
+//maybe parse it in separate pass?
+//preprocesorInstruction: expressionScope;
 
 namespaceDefinition: Namespace Name CScopeOpen globalDefinition* CScopeClose;
 
