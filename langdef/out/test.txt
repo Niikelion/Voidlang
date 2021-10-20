@@ -1,0 +1,24 @@
+enum FileType
+{
+    Vls,
+    Vlh
+}
+
+class Test
+{
+    int fd;
+    FileType type;
+}
+
+using File = Test;
+
+int main()
+{
+    File file;
+    file.type = FileType.Vlh;
+    file.fd = 5*5-25;
+    
+    
+    int c;
+    c = 23 + 4*7;
+}
