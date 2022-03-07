@@ -3,67 +3,160 @@ options {
     tokenVocab = Void1Lexer;
 }
 
-numericLiteral: DecimalNumber | HexadecimalNumber;
+//top level
+input: file;
+file: (declaration ExpressionSeparator?)* EOF;
+//declarations
+declaration: commonDeclaration;
+innerDeclaration: accessLevel? commonDeclaration;
 
-stringLiteral: SimpleString;
+accessLevel: Public | Private | Protected;
 
-type1Operation: Plus | Minus | Modulo;
-type2Operation: Mult | Divide;
+commonDeclaration: varDeclaration | functionDefinition | classDefinition;
 
-callArguments: CScopeOpen (expression (Comma expression)*)? CScopeClose;
+//variable declarations
+varDeclaration:
+    (Var | typeExpression | lambdaObjectDecl) varSubDeclaration (Comma varSubDeclaration)* |
+    Var tupleDeconstructionDecl Assignment valueExpression |
+    Var objectDeconstructionDecl Assignment valueExpression;
 
-variableAccess: Name (callArguments)? (Dot Name callArguments?)*;
+//initialization
+varSubDeclaration: identifier varDeclInit?;
+varDeclInit: Assignment valueExpression | declInit;
 
-valueExpression: numericLiteral | stringLiteral | variableAccess;
+declInit: ctorInit | piecewiseInit;
+ctorInit: CScopeOpen valueExpression (Comma valueExpression)* CScopeClose;
 
-type0Expression: type1Expression | (type1Expression Assignment type0Expression) | (CScopeOpen type0Expression CScopeClose);
-type1Expression: type2Expression | (type2Expression type1Operation type1Expression);
-type2Expression: valueExpression | (valueExpression type2Operation type2Expression);
+//deconstructing declarations
+tupleDeconstructionDecl: RScopeOpen tupleDeconstructionSubDecl (Comma tupleDeconstructionSubDecl)* RScopeClose;
+tupleDeconstructionSubDecl: deconstructionSubDecl | tupleDeconstructionDecl | objectDeconstructionDecl;
+objectDeconstructionDecl: CScopeOpen objectDeconstructionSubDecl (Comma objectDeconstructionSubDecl)* CScopeClose;
+objectDeconstructionSubDecl: deconstructionSubDecl;
 
-expression: type0Expression;
+deconstructionSubDecl: identifier (Arrow (identifier | tupleDeconstructionDecl | objectDeconstructionDecl))?;
 
-expressionSeq: ((expression ExpressionSeparator) | variableDeclaration | ExpressionSeparator)+;
+lambdaObjectDecl: CScopeOpen varDeclaration ((Comma | ExpressionSeparator) varDeclaration)* CScopeClose;
 
-expressionScope: CScopeOpen expressionSeq CScopeClose;
+//function definitions
+functionDefinition: cstyleFunctionDef | arrowFunctionDef | aliasFunctionDef;
+
+cstyleFunctionDef: functionDefSignature functionBody;
+arrowFunctionDef: functionDefSignature Arrow valueExpression;
+aliasFunctionDef: identifier argumentsDef? Arrow valueExpression;
+
+functionDefSignature: typeExpression identifier argumentsDef;
+
+argumentsDef: RScopeOpen (varDeclaration (Comma varDeclaration)*)? RScopeClose;
+functionBody: CScopeOpen expression* CScopeClose;
+
+//type definitions
+
+classDefinition:
+    Class identifier classBody;
+
+classBody:
+    CScopeOpen (innerDeclaration ExpressionSeparator?)* CScopeClose;
+
+//expressions
+expression:
+    declaration |
+    valueExpression |
+    operationExpression;
+
+valueExpression: logicalTopExpression;
+
+functionCallArgs: RScopeOpen (valueExpression (Comma valueExpression)*)? RScopeClose;
+
+logicalTopExpression:
+    ifelseOperatorExpression
+|   ifelseOperatorExpression logicalTopOperator logicalTopExpression;
+
+logicalTopOperator: LAnd | LOr;
+
+ifelseOperatorExpression: logicalExpression (IfOp valueExpression ElseOp valueExpression)?;
+
+logicalExpression:
+    shiftExpression
+|   shiftExpression logicalOperator logicalExpression;
+
+logicalOperator: Eq | NotEq | Lt | Gt | Leq | Geq;
+
+binaryExpression:
+    shiftExpression
+|   binaryExpression binaryOperator;
+
+binaryOperator: And | Or | Xor;
+
+shiftExpression: 
+    additiveExpression (shiftOperator shiftExpression)?;
+
+shiftOperator: LShift | RShift;
+
+additiveExpression:
+    multiplicativeExpression (additiveOperator additiveExpression)?;
+
+additiveOperator: Plus | Minus;
+
+multiplicativeExpression:
+    castExpression (multOperator multiplicativeExpression)?;
+
+multOperator: Mult | Divide | Modulo;
+
+castExpression:
+    unaryExpression
+|   castExpression Cast typeExpression
+|   RScopeOpen typeExpression RScopeClose valueExpression;
+
+unaryExpression:
+    postfixExpression
+|   unaryOperator unaryExpression;
+
+unaryOperator: MinusMinus | PlusPlus | Not | Neg;
+
+postfixExpression:
+    accessExpression
+|   postfixExpression postfixOperator;
+
+postfixOperator: MinusMinus | PlusPlus;
+
+accessExpression:
+    primaryExpression
+|   accessExpression Dot variableExpression
+|   accessExpression functionCallArgs;
+
+primaryExpression:
+    constantExpression |
+    lambdaObject |
+    lambdaTuple |
+    variableExpression |
+    ctorInvoke |
+    RScopeOpen valueExpression RScopeClose;
+
+variableExpression: identifier;
+
+constantExpression: numericConstant | SimpleString;
+
+piecewiseSubInit: identifier Assignment valueExpression;
+piecewiseInit: CScopeOpen piecewiseSubInit (Comma piecewiseSubInit)* CScopeClose;
+
+lambdaTuple: RScopeOpen valueExpression (Comma valueExpression)* RScopeClose;
+
+lambdaObject: CScopeOpen lambdaObjectMember ((Comma | ExpressionSeparator) lambdaObjectMember)* CScopeClose;
+lambdaObjectMember: identifier Assignment valueExpression | varDeclaration;
+lambdaObjectSubMember: identifier varDeclInit;
+
+ctorInvoke: typeExpression ctorInit;
+
+typeExpression: typeName;
+
+//operations
+operationExpression:
+    Return valueExpression?;
+
+//sub
+numericConstant: 
+    DecimalNumber | 
+    HexadecimalNumber;
 
 typeName: Name;
-
-classScope: CScopeOpen (definition)*  CScopeClose;
-
-enumScope: CScopeOpen (Name? (Comma Name)*) CScopeClose;
-
-unionScope: CScopeOpen (memberOnlyDefinition)* CScopeClose;
-
-variableDeclaration: typeName Name ExpressionSeparator;
-
-classDefinition: Class Name classScope;
-
-arguments: (typeName Name) | ((typeName Name) Comma arguments);
-
-functionDefinition: typeName Name RScopeOpen arguments RScopeClose ExpressionSeparator;
-
-functionDeclaration: typeName Name RScopeOpen arguments? RScopeClose expressionScope;
-
-function: functionDefinition | functionDeclaration;
-
-enumDefinition: Enum Name enumScope;
-
-unionDefinition: Union Name unionScope;
-
-usingDefinition: Using Name Assignment typeName ExpressionSeparator;
-
-//maybe parse it in separate pass?
-//preprocesorInstruction: expressionScope;
-
-namespaceDefinition: Namespace Name CScopeOpen globalDefinition* CScopeClose;
-
-memberOnlyDefinition: variableDeclaration | classDefinition | enumDefinition | usingDefinition;
-
-definition: memberOnlyDefinition | function;
-
-globalDefinition: definition | namespaceDefinition;
-
-
-mainScope: globalDefinition+;
-
-input: mainScope? EOF;
+identifier: Name;

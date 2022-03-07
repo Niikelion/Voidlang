@@ -1,24 +1,41 @@
-enum FileType
+//variable declarations
+int a=8
+float x,y;
+
+File input{"text.txt"}
+Pos a{x=6, y=9}
+var pos = { x=6 as f32, y=9 as f32}
+var keyValue = ("test", { type="string", value="test" })
+
+{ float x,y } hiddenPos;
+var (key, value) = keyValue
+var (key->key1, { type, value->val1 }) = keyValue
+
+newline -> print("\n")
+
+//function declarations
+
+void main()
 {
-    Vls,
-    Vlh
+    print(x)
+    newline()
+    print(y)
 }
 
-class Test
+int min(int a, int b)
 {
-    int fd;
-    FileType type;
+    ret b < a ? b : a
 }
 
-using File = Test;
+int max(int a, int b) -> b > a ? b : a
 
-int main()
+//custom types
+class Pos
 {
-    File file;
-    file.type = FileType.Vlh;
-    file.fd = 5*5-25;
-    
-    
-    int c;
-    c = 23 + 4*7;
+    priv f32 x,y;
+
+    pub magSqr -> x*x + y*y;
+    pub mag -> sqrt(magSqr())
+
+    pub dist(Pos other) -> Pos{ x-other.x, y-other.y }.magSqr()
 }
