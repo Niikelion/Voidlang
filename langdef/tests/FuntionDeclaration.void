@@ -1,0 +1,17 @@
+void newline() -> print("\n")
+
+T add<T>(T a, T b) -> a + b
+
+void main()
+{
+    print(x)
+    newline()
+    print(y)
+}
+
+int min(int a, int b)
+{
+    ret b < a ? b : a
+}
+
+int max(int a, int b) -> b > a ? b : a

@@ -41,8 +41,6 @@ And: '&';
 Or: '|';
 Xor: '^';
 Neg: '~';
-LShift: '<<';
-RShift: '>>';
 //logical
 Not: '!';
 LAnd: '&&';
@@ -56,11 +54,11 @@ Geq: '>=';
 
 //common
 Assignment: '=';
-Cast: 'as';
+As: 'as';
 Arrow: '->';
 Return: 'ret';
-IfOp: '?';
-ElseOp: ':';
+Question: '?';
+Colon: ':';
 
 //keywords
 Var: 'var';
@@ -70,5 +68,7 @@ Public: 'pub';
 Private: 'priv';
 Protected: 'prot';
 Virtual: 'virtual';
+With: 'with';
+Stateless: 'stateless';
 //qualifiers
 Name: [a-zA-Z_] ([a-zA-Z0-9_])*;
