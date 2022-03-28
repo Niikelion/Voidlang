@@ -1,0 +1,6 @@
+trait Printable
+{
+    string toString()
+}
+
+void print<T: Printable>(T v) -> println(v.toString())

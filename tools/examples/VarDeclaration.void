@@ -1,0 +1,13 @@
+int a=8
+float x,y;
+
+File input{"text.txt"}
+Pos a{x=6, y=9}
+var pos = { x=6 as f32, y=9 as f32}
+var keyValue = ("test", { type="string", value="test" })
+
+{ float x,y } hiddenPos;
+var (key, value) = keyValue
+var (key->key1, { type, value->val1 }) = keyValue
+
+var die = void() -> exit(1)

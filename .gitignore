@@ -36,3 +36,9 @@ build
 
 langdef/.antlr
 langdef/out
+
+tools/.gradle
+tools/.idea
+tools/build
+tools/libvoid/out
+tools/voidc/out

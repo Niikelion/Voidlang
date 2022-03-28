@@ -1,0 +1,31 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.5.10'
+    id 'java'
+    id 'antlr'
+    id 'java-library'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {
+        url "http://nexus.devsrsouza.com.br/repository/maven-public/"
+        allowInsecureProtocol = true
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+    antlr 'org.antlr:antlr4:4.9.3'
+    implementation "br.com.devsrsouza.eventkt:eventkt-core-jvm:0.2.0-SNAPSHOT"
+}
+
+compileKotlin.dependsOn generateGrammarSource
+
+test {
+    useJUnitPlatform()
+}
