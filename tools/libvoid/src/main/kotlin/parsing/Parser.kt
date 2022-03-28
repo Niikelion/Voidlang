@@ -24,12 +24,14 @@ class Parser() {
         println(errors.joinToString(separator = "\n"))
     }
 
-    fun parse(source: String): parsing.structure.Module? {
+    fun parse(source: String): parsing.structure.Module {
         return processData(getAntlrParser(CharStreams.fromString(source)))
     }
 
     fun parseFile(fileName: String): parsing.structure.Module? {
         val file = File(fileName)
+        if (!file.exists())
+            return null
         return processData(getAntlrParser(CharStreams.fromFileName(file.absolutePath)))
     }
 
@@ -52,7 +54,7 @@ class Parser() {
         return parser
     }
 
-    private fun processData(parser: VoidParser, ): parsing.structure.Module? {
+    private fun processData(parser: VoidParser, ): parsing.structure.Module {
         val input = parser.input()
         val sourceName = if (parser.sourceName != CharStream.UNKNOWN_SOURCE_NAME) parser.sourceName else null
         val visitor = Visitor(sourceName)

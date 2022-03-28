@@ -80,8 +80,12 @@ templateArg: identifier (Colon typeExpression)?;
 contextArgs: With contextArg (Comma contextArg)*;
 contextArg: identifier (As identifier)?;
 
-typeExpression: typeTemplate | typeExpression Dot typeTemplate | RScopeOpen typeExpression RScopeClose;
-typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt)?;
+typeExpression:
+    typeName #type
+|   typeTemplate #templateType
+|   typeExpression Dot typeTemplate #accessType
+|   RScopeOpen typeExpression RScopeClose Arrow typeExpression #functionType;
+typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt);
 //expressions
 expression:
     declaration

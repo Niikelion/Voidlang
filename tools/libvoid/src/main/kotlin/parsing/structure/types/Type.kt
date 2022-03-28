@@ -1,4 +1,6 @@
 package parsing.structure.types
 
-interface Type {
+import parsing.structure.Token
+
+interface Type: Token {
 }
