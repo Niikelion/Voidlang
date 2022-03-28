@@ -25,9 +25,11 @@ commonDeclaration: varDeclaration | functionDefinition | classDefinition | trait
 
 //variable declarations
 varDeclaration:
-    (Var | typeExpression | lambdaObjectDecl) varSubDeclaration (Comma varSubDeclaration)* |
-    Var tupleDeconstructionDecl Assignment valueExpression |
-    Var objectDeconstructionDecl Assignment valueExpression;
+    cStyleVarDeclaration | extendedcStyleVarDeclaration | deconstructionVarDeclaration;
+
+cStyleVarDeclaration: typeExpression varSubDeclaration (Comma varSubDeclaration)*;
+extendedcStyleVarDeclaration: (Var | lambdaObjectDecl) varSubDeclaration (Comma varSubDeclaration)*;
+deconstructionVarDeclaration: Var (tupleDeconstructionDecl | objectDeconstructionDecl) Assignment valueExpression;
 
 //initialization
 varSubDeclaration: identifier varDeclInit?;
@@ -54,7 +56,8 @@ arrowFunctionDef: functionDefSignature Arrow valueExpression;
 
 functionDefSignature: typeExpression identifier templateArgs? argumentsDef;
 
-argumentsDef: RScopeOpen (varDeclaration (Comma varDeclaration)*)? RScopeClose;
+argumentsDef: RScopeOpen (argumentDef (Comma argumentDef)*)? RScopeClose;
+argumentDef: typeExpression varSubDeclaration;
 functionBody: CScopeOpen (expression ExpressionSeparator?)* CScopeClose;
 
 //type definitions

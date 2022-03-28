@@ -5,10 +5,11 @@ import VoidParserBaseListener
 import br.com.devsrsouza.eventkt.scopes.LocalEventScope
 import parsing.structure.Module
 import parsing.structure.Function
-import parsing.structure.Token
+import parsing.structure.Variable
 import parsing.structure.expressions.Expression
 import parsing.structure.types.Type
 import parsing.structure.types.TypeName
+import parsing.structure.values.Value
 
 class StructureError(
     line: Int,
@@ -21,10 +22,21 @@ class StructureError(
     }
 }
 
-private class FunctionSig: Token {
+private class FunctionSig {
     var ret: Type? = null
-    var args: List<Pair<Type, String>> = emptyList()
+    var args = mutableListOf<Pair<Type, String>>()
 }
+
+private class CStyleVarSubDecl(val name: String) {
+    var value: Value? = null
+}
+
+private class VariableList {
+    val variables = mutableListOf<Variable>()
+}
+
+private typealias Handler = (Any) -> Unit
+private typealias HandlerCompanion = () -> Any
 
 class Visitor(dataSource: String? = null): VoidParserBaseListener() {
     private val source = dataSource ?: "input"
@@ -45,15 +57,24 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         ctx!!
         val module = getModule()
         if (ctx.declaration().commonDeclaration().functionDefinition() != null)
-            pushHandler({ token -> module.registerFunction(token as Function) })
+            pushHandler({ token -> run {
+                val func = token as? Function
+                func ?. run { module.registerFunction(func) }
+            } })
+        if (ctx.declaration().commonDeclaration().varDeclaration() != null)
+            pushHandler({ token -> run {
+                val variable = token as? Variable
+                variable ?. run { module.registerVariable(variable) }
+            } })
     }
 
     override fun exitTopLevelDeclaration(ctx: VoidParser.TopLevelDeclarationContext?) {
         ctx!!
 
-        if (ctx.declaration().commonDeclaration().functionDefinition() != null) {
+        if (ctx.declaration().commonDeclaration().functionDefinition() != null)
             popHandler()
-        }
+        if (ctx.declaration().commonDeclaration().varDeclaration() != null)
+            popHandler()
     }
 
     override fun exitImportDeclaration(ctx: VoidParser.ImportDeclarationContext?) {
@@ -93,12 +114,13 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
 
         pushHandler({ token ->
             run {
-                functionSig.ret = token as Type
-                replaceHandler({
+                functionSig.ret = token as? Type
+                functionSig.ret ?. run { replaceHandler({ token ->
                     run {
-                        //TODO: cast token to var declaration and extract info
+                        val v = token as? Variable
+                        v ?. run { functionSig.args.add(Pair(v.type!!, v.name)) }
                     }
-                }, { functionSig })
+                }, { functionSig }) }
             }
         }, {functionSig})
     }
@@ -123,6 +145,78 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         exitFunction()
     }
 
+    override fun enterArgumentDef(ctx: VoidParser.ArgumentDefContext?) {
+        ctx!!
+        pushHandler({ token -> run {
+            val type = token as? Type
+            type ?. run {
+                replaceHandler({ token -> run {
+                    val subDecl = token as? CStyleVarSubDecl
+                    subDecl ?. run {
+                        val variable = Variable(subDecl.name, type, subDecl.value)
+                        replaceHandler({ }, { variable })
+                    }
+                } })
+            }
+        } })
+    }
+
+    override fun exitArgumentDef(ctx: VoidParser.ArgumentDefContext?) {
+        ctx!!
+        val variable = getCompanion() as? Variable
+        popHandler()
+        variable ?. run { submit(variable) }
+    }
+
+    override fun enterVarSubDeclaration(ctx: VoidParser.VarSubDeclarationContext?) {
+        ctx!!
+
+        val typeDecl = CStyleVarSubDecl(ctx.identifier().text)
+
+        pushHandler({ token -> run {
+            val value = token as? Value
+            value ?. run {
+                typeDecl.value = value
+            }
+        }}, { typeDecl })
+    }
+
+    override fun exitVarSubDeclaration(ctx: VoidParser.VarSubDeclarationContext?) {
+        ctx!!
+
+        val varDecl = getCompanion() as? CStyleVarSubDecl
+        popHandler()
+
+        varDecl ?. run { submit(varDecl) }
+    }
+
+    override fun enterCStyleVarDeclaration(ctx: VoidParser.CStyleVarDeclarationContext?) {
+        ctx!!
+
+        val list = VariableList()
+
+        pushHandler({ token -> run {
+            val type = token as? Type
+            type ?. run {
+                replaceHandler({ token -> run {
+                    val decl = token as? CStyleVarSubDecl
+                    decl ?. run { list.variables.add(Variable(decl.name, type, decl.value)) }
+                } }, { list })
+            }
+        } }, { list })
+    }
+
+    override fun exitCStyleVarDeclaration(ctx: VoidParser.CStyleVarDeclarationContext?) {
+        ctx!!
+
+        val list = getCompanion() as? VariableList
+        popHandler()
+        list ?. run {
+            for (variable in list.variables)
+                submit(variable)
+        }
+    }
+
     override fun exitTypeName(ctx: VoidParser.TypeNameContext?) {
         ctx!!
 
@@ -145,12 +239,12 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
     }
 
     private fun exitFunction() {
-        val func = getCompanion() as Function?
+        val func = getCompanion() as? Function
         popHandler()
         func ?. run { submit(func) }
     }
 
-    private fun submit(token: Token) {
+    private fun submit(token: Any) {
         if (symbolHandlersStack.isNotEmpty())
             getHandler()(token)
     }
@@ -180,6 +274,3 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         pushHandler(handler, companion)
     }
 }
-
-private typealias Handler = (Token) -> Unit
-private typealias HandlerCompanion = () -> Any

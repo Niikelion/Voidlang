@@ -8,6 +8,6 @@ class Function(val name: String, val returnType: Type, val arguments: List<Pair<
 
     override fun readable(pad: Int): String {
         val args = arguments.joinToString(separator = ", ") { arg -> "${arg.first} ${arg.second}" }
-        return padding(pad) + "$returnType $name()"
+        return padding(pad) + "$returnType $name($args)"
     }
 }

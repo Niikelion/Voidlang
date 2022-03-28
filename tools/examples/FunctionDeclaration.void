@@ -2,7 +2,7 @@ module functions
 
 void newline() -> print("\n")
 
-T add<T>(T a, T b) -> a + b
+T add<T>(T a, T b) -> a + b //NOT IMPLEMENTED YET
 
 void main()
 {
@@ -18,7 +18,7 @@ int min(int a, int b)
 
 int max(int a, int b) -> b > a ? b : a
 
-int min<T>(T a, T b)
+int min<T>(T a, T b)        //NOT IMPLEMENTED YET
 {
     return b < a ? b : a
 }
