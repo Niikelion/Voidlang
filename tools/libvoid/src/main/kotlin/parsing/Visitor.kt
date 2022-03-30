@@ -5,7 +5,7 @@ import VoidParserBaseListener
 import br.com.devsrsouza.eventkt.scopes.LocalEventScope
 import parsing.structure.Module
 import parsing.structure.Function
-import parsing.structure.Variable
+import parsing.structure.variables.CStyleVariable
 import parsing.structure.expressions.Expression
 import parsing.structure.types.Type
 import parsing.structure.types.TypeName
@@ -32,7 +32,7 @@ private class CStyleVarSubDecl(val name: String) {
 }
 
 private class VariableList {
-    val variables = mutableListOf<Variable>()
+    val variables = mutableListOf<CStyleVariable>()
 }
 
 private typealias Handler = (Any) -> Unit
@@ -63,7 +63,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
             } })
         if (ctx.declaration().commonDeclaration().varDeclaration() != null)
             pushHandler({ token -> run {
-                val variable = token as? Variable
+                val variable = token as? CStyleVariable
                 variable ?. run { module.registerVariable(variable) }
             } })
     }
@@ -117,7 +117,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
                 functionSig.ret = token as? Type
                 functionSig.ret ?. run { replaceHandler({ token ->
                     run {
-                        val v = token as? Variable
+                        val v = token as? CStyleVariable
                         v ?. run { functionSig.args.add(Pair(v.type!!, v.name)) }
                     }
                 }, { functionSig }) }
@@ -153,7 +153,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
                 replaceHandler({ token -> run {
                     val subDecl = token as? CStyleVarSubDecl
                     subDecl ?. run {
-                        val variable = Variable(subDecl.name, type, subDecl.value)
+                        val variable = CStyleVariable(subDecl.name, type, subDecl.value)
                         replaceHandler({ }, { variable })
                     }
                 } })
@@ -163,7 +163,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
 
     override fun exitArgumentDef(ctx: VoidParser.ArgumentDefContext?) {
         ctx!!
-        val variable = getCompanion() as? Variable
+        val variable = getCompanion() as? CStyleVariable
         popHandler()
         variable ?. run { submit(variable) }
     }
@@ -200,7 +200,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
             type ?. run {
                 replaceHandler({ token -> run {
                     val decl = token as? CStyleVarSubDecl
-                    decl ?. run { list.variables.add(Variable(decl.name, type, decl.value)) }
+                    decl ?. run { list.variables.add(CStyleVariable(decl.name, type, decl.value)) }
                 } }, { list })
             }
         } }, { list })

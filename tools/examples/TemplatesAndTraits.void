@@ -1,3 +1,5 @@
+module traits
+
 trait Printable
 {
     string toString()

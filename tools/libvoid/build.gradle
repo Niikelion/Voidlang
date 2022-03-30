@@ -1,6 +1,10 @@
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
 plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.5.10'
     id 'java'
+    id 'groovy'
+    id 'idea'
     id 'antlr'
     id 'java-library'
 }
@@ -18,14 +22,27 @@ repositories {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
     antlr 'org.antlr:antlr4:4.9.3'
     implementation "br.com.devsrsouza.eventkt:eventkt-core-jvm:0.2.0-SNAPSHOT"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.0.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.0.3'
+
+    testCompileOnly "org.junit.platform:junit-platform-runner:1.0.0-M4"
 }
 
-compileKotlin.dependsOn generateGrammarSource
+sourceSets {
+    test.java.srcDirs += 'src/tests'
+    test.resources.srcDirs += 'src/tests'
+}
+
+compileKotlin {
+    //noinspection GrUnresolvedAccess
+    dependsOn generateGrammarSource
+}
 
 test {
     useJUnitPlatform()
+    dependsOn 'cleanTest'
+    testLogging.events.addAll([TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED])
 }

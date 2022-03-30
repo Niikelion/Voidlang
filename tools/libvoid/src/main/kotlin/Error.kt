@@ -12,3 +12,9 @@ open class VoidError(
         return ""
     }
 }
+
+class IOError(file: String, private val msg: String): VoidError(0, 0, file) {
+    override fun getErrorMsg(): String {
+        return "io error - $msg"
+    }
+}

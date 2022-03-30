@@ -1,17 +1,21 @@
 package void.compiler
 
 import parsing.Parser
-import parsing.structure.Module
-import java.io.File
 
 class App {
-    val files = mutableListOf<String>()
+    private val files = mutableListOf<String>()
 
     fun run() {
         val parser = Parser()
-        val modules = files.mapNotNull { file -> parser.parseFile(file) }
+
+        val modules = if (files.isNotEmpty())
+            files.mapNotNull { file -> parser.parseFile(file) }
+        else {
+            listOf(parser.parse(System.`in`))
+        }
 
         parser.printErrors()
+        parser.clearErrors()
         println("Modules:")
         println(modules.joinToString(separator = "\n-----\n") { module -> module.readable() })
     }

@@ -1,15 +1,17 @@
 package parsing.structure
 
+import parsing.structure.variables.CStyleVariable
+
 class Module(val name: String): Token {
     val imports = mutableListOf<String>()
     val functions = mutableListOf<Function>()
-    val variables = mutableListOf<Variable>()
+    val variables = mutableListOf<CStyleVariable>()
 
     fun registerFunction(func: Function) {
         functions.add(func)
     }
 
-    fun registerVariable(variable: Variable) {
+    fun registerVariable(variable: CStyleVariable) {
         variables.add(variable)
     }
 

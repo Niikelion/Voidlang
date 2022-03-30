@@ -1,3 +1,5 @@
+module types
+
 class Pos
 {
     priv f32 x,y;

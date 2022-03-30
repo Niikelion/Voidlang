@@ -1,5 +1,6 @@
 package parsing
 
+import IOError
 import VoidError
 import VoidLexer
 import VoidParser
@@ -12,26 +13,38 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import java.io.File
+import java.io.InputStream
+import parsing.structure.Module
 
-class Parser() {
-    val errors = mutableListOf<VoidError>()
+class Parser {
+    private val errors = mutableListOf<VoidError>()
 
     fun clearErrors() {
         errors.clear()
+    }
+
+    fun getErrors(): List<VoidError> {
+        return errors.toList()
     }
 
     fun printErrors() {
         println(errors.joinToString(separator = "\n"))
     }
 
-    fun parse(source: String): parsing.structure.Module {
+    fun parse(source: String): Module {
         return processData(getAntlrParser(CharStreams.fromString(source)))
     }
 
-    fun parseFile(fileName: String): parsing.structure.Module? {
+    fun parse(stream: InputStream): Module {
+        return processData(getAntlrParser(CharStreams.fromStream(stream)))
+    }
+
+    fun parseFile(fileName: String): Module? {
         val file = File(fileName)
-        if (!file.exists())
+        if (!file.exists()) {
+            logError(IOError(fileName, "could not open the file"))
             return null
+        }
         return processData(getAntlrParser(CharStreams.fromFileName(file.absolutePath)))
     }
 
@@ -46,7 +59,7 @@ class Parser() {
         val sourceName = if (input.sourceName != CharStream.UNKNOWN_SOURCE_NAME) input.sourceName else null
 
         val errorListener = EventErrorListener(sourceName)
-        errorListener.onError.listen<SyntaxError>().onEach { error -> errors.add(error) }.launchIn(GlobalScope)
+        errorListener.onError.listen<SyntaxError>().onEach { error -> logError(error) }.launchIn(GlobalScope)
 
         lexer.addErrorListener(errorListener)
         parser.addErrorListener(errorListener)
@@ -54,12 +67,16 @@ class Parser() {
         return parser
     }
 
-    private fun processData(parser: VoidParser, ): parsing.structure.Module {
+    private fun processData(parser: VoidParser): Module {
         val input = parser.input()
         val sourceName = if (parser.sourceName != CharStream.UNKNOWN_SOURCE_NAME) parser.sourceName else null
         val visitor = Visitor(sourceName)
         visitor.onError.listen<StructureError>().onEach { error -> errors.add(error) }.launchIn(GlobalScope)
         ParseTreeWalker.DEFAULT.walk(visitor, input)
         return visitor.getModule()
+    }
+
+    private fun logError(error: VoidError) {
+        errors.add(error)
     }
 }
