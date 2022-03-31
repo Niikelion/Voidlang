@@ -9,11 +9,8 @@ file: (topLevel ExpressionSeparator?)* EOF;
 
 topLevel:
     declaration #topLevelDeclaration
-|   importExpr #importDeclaration
-|   moduleDef #moduleDefinition;
-
-moduleDef: Module identifier;
-importExpr: Import identifier;
+|   Import identifier #importDeclaration
+|   Module identifier #moduleDefinition;
 
 //declarations
 declaration: commonDeclaration;
@@ -57,7 +54,7 @@ arrowFunctionDef: functionDefSignature Arrow valueExpression;
 functionDefSignature: typeExpression identifier templateArgs? argumentsDef;
 
 argumentsDef: RScopeOpen (argumentDef (Comma argumentDef)*)? RScopeClose;
-argumentDef: typeExpression varSubDeclaration;
+argumentDef: typeExpression identifier (Assignment valueExpression)?;
 functionBody: CScopeOpen (expression ExpressionSeparator?)* CScopeClose;
 
 //type definitions
@@ -84,11 +81,12 @@ contextArgs: With contextArg (Comma contextArg)*;
 contextArg: identifier (As identifier)?;
 
 typeExpression:
-    typeName #type
-|   typeTemplate #templateType
-|   typeExpression Dot typeTemplate #accessType
-|   RScopeOpen typeExpression RScopeClose Arrow typeExpression #functionType;
-typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt);
+    typeTemplate
+|   typeAccess;
+//|   typeOfFunction;
+typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt)?;
+typeAccess: typeTemplate Dot typeExpression;
+//typeOfFunction: RScopeOpen typeExpression RScopeClose Arrow typeExpression;
 //expressions
 expression:
     declaration

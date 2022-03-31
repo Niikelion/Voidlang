@@ -2,3 +2,5 @@ f() -> < 5
 
 module test
 import stl
+
+module

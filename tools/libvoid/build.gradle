@@ -36,9 +36,8 @@ sourceSets {
     test.resources.srcDirs += 'src/tests'
 }
 
-compileKotlin {
-    //noinspection GrUnresolvedAccess
-    dependsOn generateGrammarSource
+generateGrammarSource {
+    arguments += ["-visitor", "-long-messages"]
 }
 
 test {

@@ -70,9 +70,9 @@ class Parser {
     private fun processData(parser: VoidParser): Module {
         val input = parser.input()
         val sourceName = if (parser.sourceName != CharStream.UNKNOWN_SOURCE_NAME) parser.sourceName else null
-        val visitor = Visitor(sourceName)
+        val visitor = ParserVisitor(sourceName)
+        visitor.visit(input)
         visitor.onError.listen<StructureError>().onEach { error -> errors.add(error) }.launchIn(GlobalScope)
-        ParseTreeWalker.DEFAULT.walk(visitor, input)
         return visitor.getModule()
     }
 

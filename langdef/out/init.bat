@@ -1,1 +1,0 @@
-antlr4 ../Void1Lexer.g4 && antlr4 ../Void1Parser.g4 && javac Void1*.java

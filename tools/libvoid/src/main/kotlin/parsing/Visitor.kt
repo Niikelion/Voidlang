@@ -3,6 +3,7 @@ package parsing
 import VoidError
 import VoidParserBaseListener
 import br.com.devsrsouza.eventkt.scopes.LocalEventScope
+import org.antlr.v4.runtime.tree.ParseTreeWalker
 import parsing.structure.Module
 import parsing.structure.Function
 import parsing.structure.variables.CStyleVariable
@@ -64,7 +65,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         if (ctx.declaration().commonDeclaration().varDeclaration() != null)
             pushHandler({ token -> run {
                 val variable = token as? CStyleVariable
-                variable ?. run { module.registerVariable(variable) }
+                //variable ?. run { module.registerVariable(variable) }
             } })
     }
 
@@ -81,7 +82,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         ctx!!
 
         val module = getModule()
-        module.imports.add(ctx.importExpr().identifier().text)
+        module.import(ctx.identifier().text)
     }
 
     override fun exitModuleDefinition(ctx: VoidParser.ModuleDefinitionContext?) {
@@ -90,7 +91,7 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
         if (module != null)
             onError.publish(StructureError(ctx.start.line, ctx.start.charPositionInLine, source, "module must be the first expression in the file"))
         else
-            module = Module(ctx.moduleDef().identifier().text)
+            module = Module(ctx.identifier().text)
     }
 
     override fun enterArrowFunctionDef(ctx: VoidParser.ArrowFunctionDefContext?) {
@@ -215,12 +216,6 @@ class Visitor(dataSource: String? = null): VoidParserBaseListener() {
             for (variable in list.variables)
                 submit(variable)
         }
-    }
-
-    override fun exitTypeName(ctx: VoidParser.TypeNameContext?) {
-        ctx!!
-
-        submit(TypeName(ctx.identifier().text))
     }
 
     private fun enterFunction(name: String) {
