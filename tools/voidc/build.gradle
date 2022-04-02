@@ -24,7 +24,7 @@ dependencies {
 }
 
 application {
-    mainClass = "void.compiler.AppKt"
+    mainClass = "void.compiler.MainKt"
 }
 
 test {

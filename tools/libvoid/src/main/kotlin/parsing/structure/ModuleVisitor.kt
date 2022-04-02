@@ -1,18 +1,15 @@
-package parsing
+package parsing.structure
 
-import VoidParserBaseVisitor
-import br.com.devsrsouza.eventkt.scopes.LocalEventScope
-import parsing.structure.Module
 import VoidParser
+import VoidParserBaseVisitor
 import parsing.structure.variables.VariableDeclarationVisitor
 
-class ParserVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
-    val onError = LocalEventScope()
+class ModuleVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
+    val errorLogger = ErrorLogger(dataSource ?: "input")
 
-    private val source = dataSource ?: "input"
     private var module: Module? = null
 
-    private val variableVisitor = VariableDeclarationVisitor()
+    private val variableVisitor = VariableDeclarationVisitor(errorLogger)
 
     fun getModule(): Module {
         return module ?: Module("main")
@@ -20,13 +17,13 @@ class ParserVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
 
     override fun visitModuleDefinition(ctx: VoidParser.ModuleDefinitionContext) {
         if (module != null) {
-            structureError(ctx, "module was not the first expression in the file")
+            errorLogger.structureError(ctx, "module was not the first expression in the file")
             return
         }
         ctx.identifier().Name() ?. also {
             module = Module(it.text)
         } ?: run {
-            structureError(ctx, "missing module name")
+            errorLogger.structureError(ctx, "missing module name")
         }
     }
 
@@ -35,7 +32,7 @@ class ParserVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
         ctx.identifier().Name() ?. also {
             m.import(it.text)
         } ?: run {
-            structureError(ctx,"missing module name")
+            errorLogger.structureError(ctx,"missing module name")
         }
     }
 
@@ -61,16 +58,5 @@ class ParserVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
             module = Module("main")
             return module!!
         }
-    }
-
-    private fun structureError(ctx: VoidParser.TopLevelContext, msg: String) {
-        onError.publish(
-            StructureError(
-                ctx.getStart().line,
-                ctx.getStart().charPositionInLine,
-                source,
-                msg
-            )
-        )
     }
 }

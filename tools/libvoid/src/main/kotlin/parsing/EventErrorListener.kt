@@ -6,6 +6,7 @@ import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.CommonToken
 import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
+import parsing.structure.ErrorLogger
 
 class SyntaxError(
     line: Int,
@@ -24,7 +25,7 @@ class SyntaxError(
 }
 
 class EventErrorListener(private val file: String? = null): BaseErrorListener() {
-    val onError = LocalEventScope()
+    val errorLogger = ErrorLogger(file ?: "input")
 
     override fun syntaxError(
         recognizer: Recognizer<*, *>?,
@@ -34,6 +35,6 @@ class EventErrorListener(private val file: String? = null): BaseErrorListener() 
         msg: String?,
         e: RecognitionException?
     ) {
-        onError.publish(SyntaxError(line, charPositionInLine, file, offendingSymbol, msg))
+        errorLogger.publish(SyntaxError(line, charPositionInLine, file, offendingSymbol, msg))
     }
 }

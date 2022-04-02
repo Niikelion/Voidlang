@@ -20,6 +20,10 @@ repositories {
     }
 }
 
+compileJava {
+    dependsOn generateGrammarSource
+}
+
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
     antlr 'org.antlr:antlr4:4.9.3'

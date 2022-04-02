@@ -4,17 +4,13 @@ import IOError
 import VoidError
 import VoidLexer
 import VoidParser
-import br.com.devsrsouza.eventkt.listen
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.tree.ParseTreeWalker
 import java.io.File
 import java.io.InputStream
 import parsing.structure.Module
+import parsing.structure.ModuleVisitor
 
 class Parser {
     private val errors = mutableListOf<VoidError>()
@@ -59,7 +55,7 @@ class Parser {
         val sourceName = if (input.sourceName != CharStream.UNKNOWN_SOURCE_NAME) input.sourceName else null
 
         val errorListener = EventErrorListener(sourceName)
-        errorListener.onError.listen<SyntaxError>().onEach { error -> logError(error) }.launchIn(GlobalScope)
+        errorListener.errorLogger.subscribe { error -> logError(error) }
 
         lexer.addErrorListener(errorListener)
         parser.addErrorListener(errorListener)
@@ -70,9 +66,9 @@ class Parser {
     private fun processData(parser: VoidParser): Module {
         val input = parser.input()
         val sourceName = if (parser.sourceName != CharStream.UNKNOWN_SOURCE_NAME) parser.sourceName else null
-        val visitor = ParserVisitor(sourceName)
+        val visitor = ModuleVisitor(sourceName)
+        visitor.errorLogger.subscribe { error -> logError(error) }
         visitor.visit(input)
-        visitor.onError.listen<StructureError>().onEach { error -> errors.add(error) }.launchIn(GlobalScope)
         return visitor.getModule()
     }
 
