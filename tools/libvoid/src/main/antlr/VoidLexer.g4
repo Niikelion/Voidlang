@@ -1,6 +1,6 @@
 lexer grammar VoidLexer;
 
-ExpressionSeparator: ';';
+ExpressionSeparator: ';' | '\n';
 WhiteScape: [ \t\r\n]+ -> skip;
 BlockComment: '/*' .*? '*/' -> skip;
 LineComment: '//' ~ [\r\n]* -> skip;

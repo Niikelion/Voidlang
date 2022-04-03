@@ -2,5 +2,5 @@ package parsing.structure.types
 
 import parsing.structure.Token
 
-interface Type: Token {
+interface Type {
 }

@@ -2,20 +2,30 @@ package parsing.structure
 
 import VoidError
 import org.antlr.v4.runtime.ParserRuleContext
-import parsing.StructureError
+
+class StructureError(
+    line: Int,
+    pos: Int,
+    source: String? = null,
+    private val msg: String
+): VoidError(line, pos, source) {
+    override fun getErrorMsg(): String {
+        return "syntax error - $msg"
+    }
+}
 
 class ErrorLogger(private val source: String) {
-    private val subscribtions = mutableListOf<(VoidError) -> Unit>()
+    private val subscriptions = mutableListOf<(VoidError) -> Unit>()
 
     fun subscribe(callback: (VoidError) -> Unit) {
-        subscribtions.add(callback)
+        subscriptions.add(callback)
     }
 
     fun publish(err: VoidError) {
-        subscribtions.forEach { s -> s.invoke(err) }
+        subscriptions.forEach { s -> s.invoke(err) }
     }
 
-    fun structureError(ctx: ParserRuleContext, msg: String) {
+    fun structureError(ctx: ParserRuleContext, msg: String): Nothing? {
         publish(
             StructureError(
                 ctx.getStart().line,
@@ -24,5 +34,6 @@ class ErrorLogger(private val source: String) {
                 msg
             ) as VoidError
         )
+        return null
     }
 }

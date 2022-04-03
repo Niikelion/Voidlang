@@ -22,11 +22,11 @@ commonDeclaration: varDeclaration | functionDefinition | classDefinition | trait
 
 //variable declarations
 varDeclaration:
-    cStyleVarDeclaration | extendedcStyleVarDeclaration | deconstructionVarDeclaration;
+    cStyleVarDeclaration | extendedCStyleVarDeclaration | deconstructionVarDeclaration;
 
 cStyleVarDeclaration: typeExpression varSubDeclaration (Comma varSubDeclaration)*;
-extendedcStyleVarDeclaration: (Var | lambdaObjectDecl) varSubDeclaration (Comma varSubDeclaration)*;
-deconstructionVarDeclaration: Var (tupleDeconstructionDecl | objectDeconstructionDecl) Assignment valueExpression;
+extendedCStyleVarDeclaration: Var varSubDeclaration (Comma varSubDeclaration)*;
+deconstructionVarDeclaration: Var tupleDeconstructionDecl Assignment valueExpression;
 
 //initialization
 varSubDeclaration: identifier varDeclInit?;
@@ -36,14 +36,7 @@ declInit: ctorInit | piecewiseInit;
 ctorInit: CScopeOpen (valueExpression (Comma valueExpression)*)? CScopeClose;
 
 //deconstructing declarations
-tupleDeconstructionDecl: RScopeOpen tupleDeconstructionSubDecl (Comma tupleDeconstructionSubDecl)* RScopeClose;
-tupleDeconstructionSubDecl: deconstructionSubDecl | tupleDeconstructionDecl | objectDeconstructionDecl;
-objectDeconstructionDecl: CScopeOpen objectDeconstructionSubDecl (Comma objectDeconstructionSubDecl)* CScopeClose;
-objectDeconstructionSubDecl: deconstructionSubDecl;
-
-deconstructionSubDecl: identifier (Arrow (identifier | tupleDeconstructionDecl | objectDeconstructionDecl))?;
-
-lambdaObjectDecl: CScopeOpen varDeclaration ((Comma | ExpressionSeparator) varDeclaration)* CScopeClose;
+tupleDeconstructionDecl: RScopeOpen identifier (Comma identifier)* RScopeClose;
 
 //function definitions
 functionDefinition: cstyleFunctionDef | arrowFunctionDef;
@@ -81,11 +74,14 @@ contextArgs: With contextArg (Comma contextArg)*;
 contextArg: identifier (As identifier)?;
 
 typeExpression:
-    typeTemplate
-|   typeAccess;
+    typeSubExpression
+|   lambdaObjectType;
+typeSubExpression: typeTemplate | typeAccess;
 //|   typeOfFunction;
 typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt)?;
-typeAccess: typeTemplate Dot typeExpression;
+typeAccess: typeTemplate Dot typeSubExpression;
+
+lambdaObjectType: CScopeOpen cStyleVarDeclaration ((Comma | ExpressionSeparator) cStyleVarDeclaration)* CScopeClose;
 //typeOfFunction: RScopeOpen typeExpression RScopeClose Arrow typeExpression;
 //expressions
 expression:
