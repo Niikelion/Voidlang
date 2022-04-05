@@ -1,6 +1,8 @@
 package parsing.structure.types
 
-class TypeInvalid: Type {
+import org.antlr.v4.runtime.ParserRuleContext
+
+class TypeInvalid(ctx: ParserRuleContext): Type(ctx) {
     override fun toString(): String {
         return ":invalid:"
     }

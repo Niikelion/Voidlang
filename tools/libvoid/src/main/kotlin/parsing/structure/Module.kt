@@ -1,9 +1,8 @@
 package parsing.structure
 
-import parsing.structure.variables.CStyleVariable
 import parsing.structure.variables.VariableDeclaration
 
-class Module(val name: String): Token {
+class Module(val name: String): Formattable {
     private val imports = mutableListOf<String>()
     private val functions = mutableListOf<Function>()
     private val variableDeclarations = mutableListOf<VariableDeclaration>()

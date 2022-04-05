@@ -1,7 +1,6 @@
 package parsing.structure.values
 
-import parsing.structure.Token
-import parsing.structure.types.Type
+import parsing.structure.Formattable
 
-interface Value: Token {
+interface Value: Formattable {
 }

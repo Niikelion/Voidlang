@@ -15,7 +15,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
 
     override fun visitCStyleVarDeclaration(ctx: VoidParser.CStyleVarDeclarationContext?): VariableDeclaration? {
         return ctx ?. run {
-            val type = typeVisitor.getType(ctx.typeExpression())
+            val type = typeVisitor.getType(ctx.typeExpression(), ctx)
             val subdecls = ctx.varSubDeclaration()?.mapNotNull { v -> handleSubDeclaration(type, v) } ?: listOf()
             SimpleVariableDeclaration(type, subdecls)
         }
@@ -23,9 +23,9 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
 
     override fun visitExtendedCStyleVarDeclaration(ctx: VoidParser.ExtendedCStyleVarDeclarationContext?): VariableDeclaration? {
         return ctx?.run {
-            val type = ctx.Var()?.let { TypeAuto() } ?: run {
+            val type = ctx.Var()?.let { TypeAuto(ctx) } ?: run {
                 errorLogger.structureError(ctx, "invalid lambda object type")
-                TypeInvalid()
+                TypeInvalid(ctx)
             }
             val subdecls = ctx.varSubDeclaration()?.mapNotNull { v -> handleSubDeclaration(type, v) } ?: listOf()
             SimpleVariableDeclaration(type, subdecls)

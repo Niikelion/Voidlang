@@ -1,6 +1,6 @@
 package parsing.structure.expressions
 
-import parsing.structure.Token
+import parsing.structure.Formattable
 
-interface Expression: Token {
+interface Expression: Formattable {
 }
