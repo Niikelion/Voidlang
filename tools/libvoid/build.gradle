@@ -5,7 +5,6 @@ plugins {
     id 'java'
     id 'groovy'
     id 'idea'
-    id 'antlr'
     id 'java-library'
 }
 
@@ -20,13 +19,10 @@ repositories {
     }
 }
 
-compileJava {
-    dependsOn generateGrammarSource
-}
-
 dependencies {
+    implementation project(':voidg')
+
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
-    antlr 'org.antlr:antlr4:4.9.3'
     implementation "br.com.devsrsouza.eventkt:eventkt-core-jvm:0.2.0-SNAPSHOT"
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.0.3'
@@ -38,10 +34,6 @@ dependencies {
 sourceSets {
     test.java.srcDirs += 'src/tests'
     test.resources.srcDirs += 'src/tests'
-}
-
-generateGrammarSource {
-    arguments += ["-visitor", "-long-messages"]
 }
 
 test {

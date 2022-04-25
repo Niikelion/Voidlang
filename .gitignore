@@ -33,13 +33,3 @@
 
 .vs
 build
-
-langdef/.antlr
-langdef/out
-
-tools/.gradle
-tools/.idea
-tools/build
-tools/libvoid/src/main/gen
-tools/libvoid/out
-tools/voidc/out

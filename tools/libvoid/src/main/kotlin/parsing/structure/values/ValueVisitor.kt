@@ -24,7 +24,32 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
         }
     }
 
-    override fun visitSimplifiedAutoLambda(ctx: VoidParser.SimplifiedAutoLambdaContext?): Value? {
+    override fun visitMemberAccess(ctx: VoidParser.MemberAccessContext?): Value? {
+        return ctx ?. run {
+            val source = ctx.accessExpression() ?. let { getValue(it) }
+            val member = ctx.variableExpression() ?. identifier() ?. text
+            //source ?.
+            null
+        }
+    }
+
+    override fun visitCtorInvoke(ctx: VoidParser.CtorInvokeContext?): Value? {
+        return ctx ?. run {
+            val type = ctx.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeInvalid(ctx)
+            val args = ctx.ctorInit()?.valueExpression()?.mapNotNull { v -> v ?. run { getValue(v) } ?: run {
+                errorLogger.structureError(ctx, "missing constructor argument")
+            } }
+
+            args ?. run {
+                ConstructorInvoke(type, args, ctx)
+            } ?: run {
+                errorLogger.structureError(ctx, "missing constructor arguments")
+                InvalidValue(ctx)
+            }
+        }
+    }
+
+    override fun visitSimplifiedLambda(ctx: VoidParser.SimplifiedLambdaContext?): Value? {
         return ctx ?. identifier() ?. text ?. let { name -> run {
             //TODO: use ExpressionVisitor to generate body
             val body: List<Expression> = listOf()
@@ -32,13 +57,29 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
         } }
     }
 
-    override fun visitAutoLambda(ctx: VoidParser.AutoLambdaContext?): Value? {
+    override fun visitConventionalLambda(ctx: VoidParser.ConventionalLambdaContext?): Value? {
         return ctx ?. run {
-            val args = ctx.identifier() ?. mapNotNull { i -> i ?. let { LambdaFunction.ArgDef(TypeAuto(i), i.text) } ?: run {
-                errorLogger.structureError(ctx, "invalid argument name")
-            } }
-            val retType = ctx.
-            null
+            val retType = ctx.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeAuto(ctx)
+            val args = ctx.lambdaFunctionArgDef() ?. mapNotNull {
+                i -> i ?. run {
+                    val type = i.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeAuto(i)
+                    val name = i.identifier()?.text
+                    name ?. let { LambdaFunction.ArgDef(type, name) } ?: run {
+                        errorLogger.structureError(i, "invalid argument name")
+                    }
+                }
+                ?: run {
+                    errorLogger.structureError(ctx, "missing argument definition")
+                }
+            }
+            //TODO: use ExpressionVisitor to generate body
+            val body: List<Expression> = listOf()
+
+            args ?. run {
+                LambdaFunction(args, retType, body, ctx)
+            } ?: run {
+                errorLogger.structureError(ctx, "missing lambda arguments")
+            }
         }
     }
 

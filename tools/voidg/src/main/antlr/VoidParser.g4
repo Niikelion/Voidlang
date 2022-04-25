@@ -158,9 +158,9 @@ postfixExpression:
 postfixOperator: MinusMinus | PlusPlus;
 
 accessExpression:
-    primaryExpression
-|   accessExpression Dot variableExpression
-|   accessExpression functionCallArgs;
+    primaryExpression #primaryPassThrough
+|   accessExpression Dot variableExpression #memberAccess
+|   accessExpression functionCallArgs #functionCall;
 
 primaryExpression:
     constantExpression |
@@ -185,11 +185,10 @@ lambdaObject: CScopeOpen lambdaObjectMember ((Comma | ExpressionSeparator) lambd
 lambdaObjectMember: identifier Assignment valueExpression | typeExpression identifier;
 
 lambdaFunction:
-    typeExpression? argumentsDef (Arrow valueExpression | Arrow? functionBody) #conventionalLambda
-|   RScopeOpen (identifier (Comma identifier)*)? RScopeClose Arrow (valueExpression | functionBody) #autoLambda
-|   identifier Arrow (valueExpression | functionBody) #simplifiedAutoLambda;
+    typeExpression? RScopeOpen (lambdaFunctionArgDef (Comma lambdaFunctionArgDef)*)? RScopeClose Arrow (valueExpression | functionBody) #conventionalLambda
+|   identifier Arrow (valueExpression | functionBody) #simplifiedLambda;
 
-
+lambdaFunctionArgDef: typeExpression? identifier;
 
 //constructor calls
 ctorInvoke: typeExpression ctorInit (With ctorContext)?;

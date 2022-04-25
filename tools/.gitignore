@@ -1,0 +1,9 @@
+
+.gradle
+.idea
+build
+
+libvoid/out
+voidg/src/main/gen
+voidg/out
+voidc/out

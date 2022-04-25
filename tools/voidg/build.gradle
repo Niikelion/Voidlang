@@ -1,0 +1,26 @@
+plugins {
+    id 'java'
+    id 'groovy'
+    id 'idea'
+    id 'antlr'
+    id 'java-library'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+compileJava {
+    dependsOn generateGrammarSource
+}
+
+dependencies {
+    antlr 'org.antlr:antlr4:4.9.3'
+}
+
+generateGrammarSource {
+    arguments += ["-visitor", "-long-messages"]
+}

@@ -1,0 +1,4 @@
+package compiling
+
+class Compiler {
+}
