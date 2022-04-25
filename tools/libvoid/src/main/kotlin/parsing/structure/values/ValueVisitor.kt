@@ -2,6 +2,7 @@ package parsing.structure.values
 
 import VoidParserBaseVisitor
 import VoidParser
+import arrow.core.Nullable
 import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.ErrorLogger
 import parsing.structure.expressions.Expression
@@ -24,28 +25,50 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
         }
     }
 
+    override fun visitUnaryOp(ctx: VoidParser.UnaryOpContext?): Value? {
+        return ctx ?. run {
+            val value = ctx.unaryExpression() ?. let { getValue(it) }
+            val opC = ctx.unaryOperator()
+            val op = opC ?. PlusPlus() ?. let { UnaryOperation.Op.Inc } ?:
+            opC ?. MinusMinus() ?. let { UnaryOperation.Op.Dec }
+
+            Nullable.zip(value, op) { v, o -> UnaryOperation(v, o, false, ctx) }
+        }
+    }
+
+    override fun visitPostfixOp(ctx: VoidParser.PostfixOpContext?): Value? {
+        return ctx ?. run {
+            val value = ctx.postfixExpression() ?. let { getValue(it) }
+            val opC = ctx.postfixOperator()
+            val op = opC ?. PlusPlus() ?. let { UnaryOperation.Op.Inc } ?:
+                    opC ?. MinusMinus() ?. let { UnaryOperation.Op.Dec }
+
+            Nullable.zip(value, op) { v, o -> UnaryOperation(v, o, true, ctx) }
+        }
+    }
+
+    override fun visitFunctionCall(ctx: VoidParser.FunctionCallContext?): Value? {
+        return ctx ?. run {
+            val function = ctx.accessExpression() ?. let { getValue(it) }
+            val args = ctx.functionCallArgs() ?. valueExpression() ?. mapNotNull { v -> v ?. let { getValue(v) } }
+            Nullable.zip(function, args) { f, a -> FunctionInvoke(f, a, ctx) }
+        }
+    }
+
     override fun visitMemberAccess(ctx: VoidParser.MemberAccessContext?): Value? {
         return ctx ?. run {
             val source = ctx.accessExpression() ?. let { getValue(it) }
             val member = ctx.variableExpression() ?. identifier() ?. text
-            //source ?.
-            null
+            Nullable.zip(source, member) { s, m -> MemberAccess(s, m, ctx) }
         }
     }
 
     override fun visitCtorInvoke(ctx: VoidParser.CtorInvokeContext?): Value? {
         return ctx ?. run {
             val type = ctx.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeInvalid(ctx)
-            val args = ctx.ctorInit()?.valueExpression()?.mapNotNull { v -> v ?. run { getValue(v) } ?: run {
-                errorLogger.structureError(ctx, "missing constructor argument")
-            } }
+            val args = ctx.ctorInit() ?. valueExpression() ?. mapNotNull { v -> v ?. let { getValue(v) } }
 
-            args ?. run {
-                ConstructorInvoke(type, args, ctx)
-            } ?: run {
-                errorLogger.structureError(ctx, "missing constructor arguments")
-                InvalidValue(ctx)
-            }
+            args ?. run { ConstructorInvoke(type, args, ctx) }
         }
     }
 
@@ -79,6 +102,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
                 LambdaFunction(args, retType, body, ctx)
             } ?: run {
                 errorLogger.structureError(ctx, "missing lambda arguments")
+                InvalidValue(ctx)
             }
         }
     }

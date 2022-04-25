@@ -146,14 +146,14 @@ castExpression:
 |   RScopeOpen typeExpression RScopeClose valueExpression #cCast;
 
 unaryExpression:
-    postfixExpression
-|   unaryOperator unaryExpression;
+    postfixExpression #postfixPassThrough
+|   unaryOperator unaryExpression #unaryOp;
 
 unaryOperator: MinusMinus | PlusPlus | Not | Neg;
 
 postfixExpression:
-    accessExpression
-|   postfixExpression postfixOperator;
+    accessExpression #accessPassThrough
+|   postfixExpression postfixOperator #postfixOp;
 
 postfixOperator: MinusMinus | PlusPlus;
 
