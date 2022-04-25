@@ -141,9 +141,9 @@ multiplicativeExpression:
 multOperator: Mult | Divide | Modulo;
 
 castExpression:
-    unaryExpression
-|   castExpression As typeExpression
-|   RScopeOpen typeExpression RScopeClose valueExpression;
+    unaryExpression #unaryPassthrough
+|   castExpression As typeExpression #asCast
+|   RScopeOpen typeExpression RScopeClose valueExpression #cCast;
 
 unaryExpression:
     postfixExpression
@@ -173,20 +173,23 @@ primaryExpression:
 
 variableExpression: identifier;
 
-constantExpression: numericConstant | SimpleString;
+constantExpression: numericConstant | stringConstant;
 
-piecewiseSubInit: identifier Assignment valueExpression;
+piecewiseSubInit: Dot identifier Assignment valueExpression;
 piecewiseInit: CScopeOpen piecewiseSubInit (Comma piecewiseSubInit)* CScopeClose;
 
 //lambdas
 lambdaTuple: RScopeOpen valueExpression (Comma valueExpression)* RScopeClose;
 
 lambdaObject: CScopeOpen lambdaObjectMember ((Comma | ExpressionSeparator) lambdaObjectMember)* CScopeClose;
-lambdaObjectMember: identifier varDeclInit | typeExpression identifier;
+lambdaObjectMember: identifier Assignment valueExpression | typeExpression identifier;
 
-lambdaFunction: conventionalLambda | autoLambda;
-conventionalLambda: typeExpression? argumentsDef (Arrow valueExpression | Arrow? functionBody);
-autoLambda: identifier Arrow (valueExpression | functionBody);
+lambdaFunction:
+    typeExpression? argumentsDef (Arrow valueExpression | Arrow? functionBody) #conventionalLambda
+|   RScopeOpen (identifier (Comma identifier)*)? RScopeClose Arrow (valueExpression | functionBody) #autoLambda
+|   identifier Arrow (valueExpression | functionBody) #simplifiedAutoLambda;
+
+
 
 //constructor calls
 ctorInvoke: typeExpression ctorInit (With ctorContext)?;
@@ -204,6 +207,9 @@ operationExpression:
 numericConstant: 
     DecimalNumber |
     HexadecimalNumber;
+
+stringConstant:
+    SimpleString;
 
 typeName: identifier;
 identifier: Name;

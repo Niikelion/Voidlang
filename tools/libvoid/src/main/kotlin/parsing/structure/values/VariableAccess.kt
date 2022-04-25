@@ -1,6 +1,8 @@
 package parsing.structure.values
 
-class VariableAccess(val name: String): Value {
+import org.antlr.v4.runtime.ParserRuleContext
+
+class VariableAccess(val name: String, ctx: ParserRuleContext): Value(ctx) {
     override fun toString(): String {
         return name
     }

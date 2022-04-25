@@ -1,21 +1,32 @@
 package parsing.structure.variables
 
 import VoidParserBaseVisitor
+import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.ErrorLogger
 import parsing.structure.types.Type
 import parsing.structure.types.TypeAuto
 import parsing.structure.types.TypeInvalid
 import parsing.structure.types.TypeVisitor
+import parsing.structure.values.ConstructorInvoke
+import parsing.structure.values.PiecewiseInitialization
 import parsing.structure.values.Value
 import parsing.structure.values.ValueVisitor
+import parsing.structure.values.constants.InvalidValue
 
 class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null, vV: ValueVisitor? = null): VoidParserBaseVisitor<VariableDeclaration?>() {
     private val typeVisitor = tV ?: TypeVisitor(errorLogger, this)
-    private val valueVisitor = vV ?: ValueVisitor(errorLogger)
+    private val valueVisitor = vV ?: ValueVisitor(errorLogger, typeVisitor)
+
+    fun getDeclaration(ctx: ParserRuleContext): VariableDeclaration {
+        return visit(ctx) ?: run {
+            errorLogger.structureError(ctx, "declaration missing")
+            InvalidVariableDeclaration()
+        }
+    }
 
     override fun visitCStyleVarDeclaration(ctx: VoidParser.CStyleVarDeclarationContext?): VariableDeclaration? {
         return ctx ?. run {
-            val type = typeVisitor.getType(ctx.typeExpression(), ctx)
+            val type = typeVisitor.getType(ctx.typeExpression())
             val subdecls = ctx.varSubDeclaration()?.mapNotNull { v -> handleSubDeclaration(type, v) } ?: listOf()
             SimpleVariableDeclaration(type, subdecls)
         }
@@ -41,28 +52,48 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
                 }
             } ?: listOf()
             val value = valueVisitor.getValue(ctx.valueExpression())
-            value?.let {
-                VariableTupleDeconstruction(members, value)
+            VariableTupleDeconstruction(members, value)
+        }
+    }
+
+    private fun indirectInitialization(type: Type, ctx: VoidParser.DeclInitContext): Value {
+        return ctx.ctorInit() ?. let { constructorInitialization(type, it) } ?:
+        ctx.piecewiseInit() ?. let { piecewiseInitialization(type, it) } ?: run {
+            errorLogger.structureError(ctx, "this variable initialization is not supported")
+            return InvalidValue(ctx)
+        }
+    }
+
+    private fun constructorInitialization(type: Type, ctx: VoidParser.CtorInitContext): Value {
+        val args = ctx.valueExpression().mapNotNull {
+            it ?. let {
+                valueVisitor.getValue(it)
             } ?: run {
-                errorLogger.structureError(ctx, "missing tuple value assignment")
+                errorLogger.structureError(ctx, "value expression expected")
             }
         }
+        return ConstructorInvoke(type, args, ctx)
     }
 
-    private fun constructorInitialization(type: Type, ctx: VoidParser.DeclInitContext?): Value? {
-        return ctx ?. run {
-            //TODO
-            errorLogger.structureError(ctx, "this variable initialization is not supported")
+    private fun piecewiseInitialization(type: Type, ctx: VoidParser.PiecewiseInitContext): Value {
+        val members = ctx.piecewiseSubInit().mapNotNull {
+            v -> v ?. identifier() ?. text ?. let { VarSubDecl(it, valueVisitor.getValue(v.valueExpression())) } ?: run {
+                errorLogger.structureError(ctx, "invalid member initializer")
+            }
         }
+
+        return PiecewiseInitialization(type, members, ctx)
     }
 
-    private fun handleSubDeclaration(type: Type, ctx: VoidParser.VarSubDeclarationContext?) : SimpleVariableDeclaration.SubDecl? {
+    private fun handleSubDeclaration(type: Type, ctx: VoidParser.VarSubDeclarationContext?) : VarSubDecl? {
         return ctx?.run {
             val name = ctx.identifier()?.Name()?.text
-            val value = ctx.varDeclInit()?.let {
-                valueVisitor.getValue(it.valueExpression()) ?: constructorInitialization(type, it.declInit())
+            val value = ctx.varDeclInit()?.let { it ->
+                it.valueExpression() ?. let { i -> valueVisitor.getValue(i)} ?:
+                it.declInit() ?. let { i -> indirectInitialization(type, i) } ?:
+                InvalidValue(it)
             }
-            name?.let { SimpleVariableDeclaration.SubDecl(name, value) } ?: run {
+            name?.let { VarSubDecl(name, value) } ?: run {
                 errorLogger.structureError(ctx, "missing variable name")
             }
         }

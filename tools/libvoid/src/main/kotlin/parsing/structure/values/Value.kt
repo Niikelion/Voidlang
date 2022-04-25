@@ -1,6 +1,13 @@
 package parsing.structure.values
 
-import parsing.structure.Formattable
+import Positional
+import org.antlr.v4.runtime.ParserRuleContext
+import parsing.structure.Token
 
-interface Value: Formattable {
+open class Value(private val positional: Positional): Token {
+    override fun getOrigin(): Positional {
+        return positional
+    }
+
+    constructor(ctx: ParserRuleContext) : this(Positional(ctx))
 }
