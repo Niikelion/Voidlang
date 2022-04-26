@@ -11,7 +11,6 @@ import parsing.structure.types.TypeInvalid
 import parsing.structure.types.TypeVisitor
 import parsing.structure.values.constants.IntegerValue
 import parsing.structure.values.constants.InvalidValue
-import parsing.structure.values.constants.ObjectValue
 import parsing.structure.values.constants.StringValue
 import java.math.BigInteger
 
@@ -241,7 +240,10 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
     }
 
     override fun visitStringConstant(ctx: VoidParser.StringConstantContext?): Value? {
-        return ctx ?. SimpleString() ?.let { StringValue(it.text, ctx) }
+        return ctx ?. SimpleString() ?.let {
+            val t = it.text
+            StringValue(t.substring(1, t.count() - 2), ctx)
+        }
     }
 
     override fun visitVariableExpression(ctx: VoidParser.VariableExpressionContext?): Value? {
@@ -259,7 +261,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
         return ctx ?. run {
             val members = ctx.lambdaObjectMember().mapNotNull { it ?. run {
                 it.identifier() ?. text ?. let { name -> run {
-                    val type = it.typeExpression() ?. let { t -> typeVisitor.getType(t) } ?: TypeInvalid(it)
+                    val type = it.typeExpression() ?. let { t -> typeVisitor.getType(t) } ?: TypeAuto(it)
                     val value = it.valueExpression() ?. let { v -> getValue(v) }
 
                     ObjectValue.ObjectSubDecl(type, name, value)

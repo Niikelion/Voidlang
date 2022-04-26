@@ -8,6 +8,6 @@ class TypeAuto(pos: Positional): Type(pos) {
     constructor(): this(Positional(0, 0, ""))
 
     override fun toString(): String {
-        return ":auto:"
+        return "var"
     }
 }

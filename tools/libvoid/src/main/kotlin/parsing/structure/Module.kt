@@ -22,7 +22,7 @@ class Module(val name: String): Formattable {
     override fun readable(pad: Int): String {
         val imports = "import " + imports.toList().joinToString(separator = ", ")
         val functions = functions.toList().joinToString(separator = "\n") { func -> func.readable(pad+1) }
-        val vars = variableDeclarations.toList().map { decl -> decl.getVariables() }.flatten().joinToString(separator = "\n") { variable -> padding(pad+1) + variable }
+        val vars = variableDeclarations.joinToString(separator = "\n")
         return padding(pad) + "module $name" +
                 if (this.imports.isNotEmpty()) "\n$imports" else "" +
                 if (this.functions.isNotEmpty()) "\n$functions" else "" +

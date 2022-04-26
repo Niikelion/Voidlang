@@ -9,4 +9,10 @@ class SimpleVariableDeclaration(val type: Type, variables: List<VarSubDecl>): Va
     override fun getVariables(): List<Variable> {
         return declaredVariables.map { v -> Variable(type, v.name) }
     }
+
+    override fun toString(): String {
+        return declaredVariables.joinToString("\n") {
+            "${it.type} ${it.name}" + (it.initialValue ?. let { v -> " = $v" } ?: "")
+        }
+    }
 }

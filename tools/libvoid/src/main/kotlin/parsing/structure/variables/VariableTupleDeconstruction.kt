@@ -8,4 +8,8 @@ class VariableTupleDeconstruction(val members: List<String>, val value: Value): 
     override fun getVariables(): List<Variable> {
         return members.map { m -> Variable(TypeAuto(), m) }
     }
+
+    override fun toString(): String {
+        return members.joinToString("\n") { "${TypeAuto()} $it = ($value).$it" }
+    }
 }
