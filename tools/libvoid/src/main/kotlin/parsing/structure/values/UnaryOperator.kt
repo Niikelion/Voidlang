@@ -2,9 +2,9 @@ package parsing.structure.values
 
 import org.antlr.v4.runtime.ParserRuleContext
 
-class UnaryOperation(val argument: Value, val op: Op, val postfix: Boolean, ctx: ParserRuleContext): Value(ctx) {
+class UnaryOperator(val argument: Value, val op: Op, val postfix: Boolean, ctx: ParserRuleContext): Value(ctx) {
     enum class Op {
-        Inc, Dec
+        Inc, Dec, Not, Neg
     }
 
     override fun toString(): String {

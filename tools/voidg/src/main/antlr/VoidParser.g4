@@ -102,41 +102,46 @@ valueExpression: assignmentExpression;
 functionCallArgs: RScopeOpen (valueExpression (Comma valueExpression)*)? RScopeClose;
 
 assignmentExpression:
-    logicalTopExpression
-|   logicalExpression Assignment valueExpression;
+    logicalTopExpression #logicalTopPassThrough
+|   logicalExpression Assignment valueExpression #assignmentOp;
 
 logicalTopExpression:
-    ifelseOperatorExpression
-|   ifelseOperatorExpression logicalTopOperator logicalTopExpression;
+    ifElseOperatorExpression #ifElseOperatorPassThrough
+|   ifElseOperatorExpression logicalTopOperator logicalTopExpression #logicalTopOp;
 
 logicalTopOperator: LAnd | LOr;
 
-ifelseOperatorExpression: logicalExpression (Question valueExpression Colon valueExpression)?;
+ifElseOperatorExpression:
+    logicalExpression #logicalPassThrough
+|   logicalExpression Question valueExpression Colon valueExpression #ifElseOp;
 
 logicalExpression:
-    binaryExpression
-|   binaryExpression logicalOperator binaryExpression;
+    binaryExpression #binaryPassThrough
+|   binaryExpression logicalOperator binaryExpression #logicalOp;
 
 logicalOperator: Eq | NotEq | Lt | Gt | Leq | Geq;
 
 binaryExpression:
-    shiftExpression
-|   binaryExpression binaryOperator;
+    shiftExpression #shiftPassThrough
+|   shiftExpression binaryOperator binaryExpression #binaryOp;
 
 binaryOperator: And | Or | Xor;
 
-shiftExpression: 
-    additiveExpression (shiftOperator shiftExpression)?;
+shiftExpression:
+    additiveExpression #additivePassThrough
+|   additiveExpression shiftOperator shiftExpression #shiftOp;
 
 shiftOperator: Lt Lt | Gt Gt;
 
 additiveExpression:
-    multiplicativeExpression (additiveOperator additiveExpression)?;
+    multiplicativeExpression #multiplicativePassThrough
+|   multiplicativeExpression additiveOperator additiveExpression #additiveOp;
 
 additiveOperator: Plus | Minus;
 
 multiplicativeExpression:
-    castExpression (multOperator multiplicativeExpression)?;
+    castExpression #castPassThrough
+|   castExpression multOperator multiplicativeExpression #multiplicativeOp;
 
 multOperator: Mult | Divide | Modulo;
 
