@@ -242,7 +242,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
     override fun visitStringConstant(ctx: VoidParser.StringConstantContext?): Value? {
         return ctx ?. SimpleString() ?.let {
             val t = it.text
-            StringValue(t.substring(1, t.count() - 2), ctx)
+            StringValue(t.substring(1, t.count() - 1), ctx)
         }
     }
 

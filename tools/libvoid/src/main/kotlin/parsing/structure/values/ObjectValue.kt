@@ -8,7 +8,7 @@ import parsing.structure.types.TypeInvalid
 class ObjectValue(val members: List<ObjectSubDecl>, ctx: ParserRuleContext): Value(ctx) {
     class ObjectSubDecl(val type: Type, val name: String, val value: Value?) {
         override fun toString(): String {
-            val rest = value ?. let { "=$it" } ?: ""
+            val rest = value ?. let { " = $it" } ?: ""
             val t = when (type) {
                 is TypeAuto -> if (value != null) "" else "${TypeInvalid()} "
                 else -> "$type "
