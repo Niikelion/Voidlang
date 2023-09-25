@@ -5,17 +5,18 @@ import VoidParser
 import arrow.core.Nullable
 import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.ErrorLogger
-import parsing.structure.expressions.Expression
+import parsing.structure.VisitorPack
 import parsing.structure.types.TypeAuto
 import parsing.structure.types.TypeInvalid
-import parsing.structure.types.TypeVisitor
 import parsing.structure.values.constants.IntegerValue
 import parsing.structure.values.constants.InvalidValue
 import parsing.structure.values.constants.StringValue
 import java.math.BigInteger
 
-class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null): VoidParserBaseVisitor<Value?>() {
-    private val typeVisitor: TypeVisitor = tV ?: TypeVisitor(errorLogger)
+class ValueVisitor(
+    private val errorLogger: ErrorLogger,
+    private val p: VisitorPack
+): VoidParserBaseVisitor<Value?>() {
 
     fun getValue(ctx: ParserRuleContext): Value {
         return visit(ctx) ?: run {
@@ -132,7 +133,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
     override fun visitAsCast(ctx: VoidParser.AsCastContext?): Value? {
         return ctx ?. run {
             val value = ctx.castExpression() ?. let { getValue(it) }
-            val type = ctx.typeExpression() ?. let { typeVisitor.getType(it) }
+            val type = ctx.typeExpression() ?. let { p.getType(it) }
 
             Nullable.zip(value, type) { v, t -> ValueCast(v, t, ctx) }
         }
@@ -140,8 +141,8 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
 
     override fun visitCCast(ctx: VoidParser.CCastContext?): Value? {
         return ctx ?. run {
-            val value = ctx.valueExpression() ?. let { getValue(it) }
-            val type = ctx.typeExpression() ?. let { typeVisitor.getType(it) }
+            val value = ctx.valueExpression() ?. let { p.getValue(it) }
+            val type = ctx.typeExpression() ?. let { p.getType(it) }
 
             Nullable.zip(value, type) { v, t -> ValueCast(v, t, ctx) }
         }
@@ -189,7 +190,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
 
     override fun visitCtorInvoke(ctx: VoidParser.CtorInvokeContext?): Value? {
         return ctx ?. run {
-            val type = ctx.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeInvalid(ctx)
+            val type = ctx.typeExpression() ?. let { p.getType(it) } ?: TypeInvalid(ctx)
             val args = ctx.ctorInit() ?. valueExpression() ?. mapNotNull { v -> v ?. let { getValue(v) } }
 
             args ?. run { ConstructorInvoke(type, args, ctx) }
@@ -197,21 +198,23 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
     }
 
     override fun visitSimplifiedLambda(ctx: VoidParser.SimplifiedLambdaContext?): Value? {
-        return ctx ?. identifier() ?. text ?. let { name -> run {
-            //TODO: use ExpressionVisitor to generate body
-            val body: List<Expression> = listOf()
-            LambdaFunction(listOf(LambdaFunction.ArgDef(TypeAuto(ctx), name)), TypeAuto(ctx), body, ctx)
-        } }
+        return ctx ?. run {
+            val name = identifier() ?. text
+            val body = ctx . functionBody() ?. let { p.getFunctionBody(it) }
+            Nullable.zip(name, body) { n , b -> run {
+                Function(listOf(Function.ArgDef(TypeAuto(ctx), n)), TypeAuto(ctx), b, true, ctx)
+            } }
+        }
     }
 
     override fun visitConventionalLambda(ctx: VoidParser.ConventionalLambdaContext?): Value? {
         return ctx ?. run {
-            val retType = ctx.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeAuto(ctx)
+            val retType = ctx.typeExpression() ?. let { p.getType(it) } ?: TypeAuto(ctx)
             val args = ctx.lambdaFunctionArgDef() ?. mapNotNull {
                 i -> i ?. run {
-                    val type = i.typeExpression() ?. let { typeVisitor.getType(it) } ?: TypeAuto(i)
+                    val type = i.typeExpression() ?. let { p.getType(it) } ?: TypeAuto(i)
                     val name = i.identifier()?.text
-                    name ?. let { LambdaFunction.ArgDef(type, name) } ?: run {
+                    name ?. let { Function.ArgDef(type, name) } ?: run {
                         errorLogger.structureError(i, "invalid argument name")
                     }
                 }
@@ -219,15 +222,11 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
                     errorLogger.structureError(ctx, "missing argument definition")
                 }
             }
-            //TODO: use ExpressionVisitor to generate body
-            val body: List<Expression> = listOf()
+            val body = ctx.functionBody() ?. let { p.getFunctionBody(it) }
 
-            args ?. run {
-                LambdaFunction(args, retType, body, ctx)
-            } ?: run {
-                errorLogger.structureError(ctx, "missing lambda arguments")
-                InvalidValue(ctx)
-            }
+            Nullable.zip(args, body) { a, b -> run {
+                Function(a, retType, b, true, ctx)
+            } }
         }
     }
 
@@ -261,7 +260,7 @@ class ValueVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null
         return ctx ?. run {
             val members = ctx.lambdaObjectMember().mapNotNull { it ?. run {
                 it.identifier() ?. text ?. let { name -> run {
-                    val type = it.typeExpression() ?. let { t -> typeVisitor.getType(t) } ?: TypeAuto(it)
+                    val type = it.typeExpression() ?. let { t -> p.getType(t) } ?: TypeAuto(it)
                     val value = it.valueExpression() ?. let { v -> getValue(v) }
 
                     ObjectValue.ObjectSubDecl(type, name, value)

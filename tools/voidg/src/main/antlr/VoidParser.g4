@@ -5,7 +5,9 @@ options {
 
 //top level
 input: file;
-file: (topLevel ExpressionSeparator?)* EOF;
+file: line* EOF;
+
+line: topLevel | topLevel ExpressionSeparator;
 
 topLevel:
     declaration #topLevelDeclaration
@@ -48,7 +50,8 @@ functionDefSignature: typeExpression identifier templateArgs? argumentsDef;
 
 argumentsDef: RScopeOpen (argumentDef (Comma argumentDef)*)? RScopeClose;
 argumentDef: typeExpression identifier (Assignment valueExpression)?;
-functionBody: CScopeOpen (expression ExpressionSeparator?)* CScopeClose;
+functionBody: CScopeOpen ExpressionSeparator* ((expression | expression ExpressionSeparator))* ExpressionSeparator* CScopeClose | valueExpression;
+functionCallArgs: RScopeOpen (valueExpression (Comma valueExpression)*)? RScopeClose;
 
 //type definitions
 
@@ -92,14 +95,16 @@ expression:
 
 //scope expressions
 scopeExpression: 
-    CScopeOpen (expression ExpressionSeparator?)* CScopeClose
-|   With ctorContext scopeExpression?
-|   Stateless scopeExpression;
+    CScopeOpen (expression ExpressionSeparator?)* CScopeClose #blockExp
+|   With ctorContext scopeExpression? #statedExp
+|   Stateless scopeExpression #statelessExp;
 
 //value expressions
-valueExpression: assignmentExpression;
+valueExpression: lambdaExpression;
 
-functionCallArgs: RScopeOpen (valueExpression (Comma valueExpression)*)? RScopeClose;
+lambdaExpression:
+    assignmentExpression #assignmentPassThrough
+|   lambdaFunction #lambda;
 
 assignmentExpression:
     logicalTopExpression #logicalTopPassThrough
@@ -168,13 +173,12 @@ accessExpression:
 |   accessExpression functionCallArgs #functionCall;
 
 primaryExpression:
+    RScopeOpen valueExpression RScopeClose |
     constantExpression |
     lambdaObject |
     lambdaTuple |
-    lambdaFunction |
     variableExpression |
-    ctorInvoke |
-    RScopeOpen valueExpression RScopeClose;
+    ctorInvoke;
 
 variableExpression: identifier;
 
@@ -184,14 +188,14 @@ piecewiseSubInit: Dot identifier Assignment valueExpression;
 piecewiseInit: CScopeOpen piecewiseSubInit (Comma piecewiseSubInit)* CScopeClose;
 
 //lambdas
-lambdaTuple: RScopeOpen valueExpression (Comma valueExpression)* RScopeClose;
+lambdaTuple: RScopeOpen valueExpression (Comma valueExpression)+ RScopeClose;
 
 lambdaObject: CScopeOpen lambdaObjectMember ((Comma | ExpressionSeparator) lambdaObjectMember)* CScopeClose;
 lambdaObjectMember: identifier Assignment valueExpression | typeExpression identifier;
 
 lambdaFunction:
-    typeExpression? RScopeOpen (lambdaFunctionArgDef (Comma lambdaFunctionArgDef)*)? RScopeClose Arrow (valueExpression | functionBody) #conventionalLambda
-|   identifier Arrow (valueExpression | functionBody) #simplifiedLambda;
+    typeExpression? RScopeOpen (lambdaFunctionArgDef (Comma lambdaFunctionArgDef)*)? RScopeClose Arrow functionBody #conventionalLambda
+|   identifier Arrow functionBody #simplifiedLambda;
 
 lambdaFunctionArgDef: typeExpression? identifier;
 
@@ -205,7 +209,11 @@ contextMapPart: identifier Assignment valueExpression;
 
 //operations
 operationExpression:
-    Return valueExpression?;
+    Return valueExpression? #returnExpression
+|   ifElseExpression #ifElseExp;
+
+ifElseExpression:
+    If valueExpression expression (Else expression)??;
 
 //sub
 numericConstant: 

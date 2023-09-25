@@ -3,12 +3,13 @@ package parsing.structure.types
 import VoidParserBaseVisitor
 import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.ErrorLogger
+import parsing.structure.VisitorPack
 import parsing.structure.variables.SimpleVariableDeclaration
-import parsing.structure.variables.VariableDeclarationVisitor
 
-class TypeVisitor(private val errorLogger: ErrorLogger, vV: VariableDeclarationVisitor? = null): VoidParserBaseVisitor<Type?>() {
-    private val variableDeclarationVisitor = vV ?: VariableDeclarationVisitor(errorLogger, this)
-
+class TypeVisitor(
+    private val errorLogger: ErrorLogger,
+    private val p: VisitorPack
+): VoidParserBaseVisitor<Type?>() {
     fun getType(ctx: ParserRuleContext): Type {
         return visit(ctx) ?: run {
             errorLogger.structureError(ctx, "type expected")
@@ -43,7 +44,7 @@ class TypeVisitor(private val errorLogger: ErrorLogger, vV: VariableDeclarationV
     override fun visitLambdaObjectType(ctx: VoidParser.LambdaObjectTypeContext?): Type? {
         return ctx?.run {
             val members = ctx.cStyleVarDeclaration()?.mapNotNull { v -> v?.let {
-                val memberDecl = variableDeclarationVisitor.getDeclaration(v) as? SimpleVariableDeclaration
+                val memberDecl = p.getDeclaration(v) as? SimpleVariableDeclaration
                 memberDecl?.declaredVariables
             } } ?: listOf()
             LambdaObjectType(ctx, members.flatten())

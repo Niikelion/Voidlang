@@ -1,6 +1,7 @@
 package parsing.structure
 
 import parsing.structure.variables.VariableDeclaration
+import parsing.structure.values.Function
 
 class Module(val name: String): Formattable {
     private val imports = mutableListOf<String>()
@@ -21,7 +22,7 @@ class Module(val name: String): Formattable {
 
     override fun readable(pad: Int): String {
         val imports = "import " + imports.toList().joinToString(separator = ", ")
-        val functions = functions.toList().joinToString(separator = "\n") { func -> func.readable(pad+1) }
+        val functions = functions.toList().joinToString(separator = "\n")
         val vars = variableDeclarations.joinToString(separator = "\n")
         return padding(pad) + "module $name" +
                 if (this.imports.isNotEmpty()) "\n$imports" else "" +

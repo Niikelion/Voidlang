@@ -3,19 +3,19 @@ package parsing.structure.variables
 import VoidParserBaseVisitor
 import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.ErrorLogger
+import parsing.structure.VisitorPack
 import parsing.structure.types.Type
 import parsing.structure.types.TypeAuto
 import parsing.structure.types.TypeInvalid
-import parsing.structure.types.TypeVisitor
 import parsing.structure.values.ConstructorInvoke
 import parsing.structure.values.PiecewiseInitialization
 import parsing.structure.values.Value
-import parsing.structure.values.ValueVisitor
 import parsing.structure.values.constants.InvalidValue
 
-class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeVisitor? = null, vV: ValueVisitor? = null): VoidParserBaseVisitor<VariableDeclaration?>() {
-    private val typeVisitor = tV ?: TypeVisitor(errorLogger, this)
-    private val valueVisitor = vV ?: ValueVisitor(errorLogger, typeVisitor)
+class VariableDeclarationVisitor(
+    private val errorLogger: ErrorLogger,
+    private val p: VisitorPack
+): VoidParserBaseVisitor<VariableDeclaration?>() {
 
     fun getDeclaration(ctx: ParserRuleContext): VariableDeclaration {
         return visit(ctx) ?: run {
@@ -26,7 +26,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
 
     override fun visitCStyleVarDeclaration(ctx: VoidParser.CStyleVarDeclarationContext?): VariableDeclaration? {
         return ctx ?. run {
-            val type = typeVisitor.getType(ctx.typeExpression())
+            val type = p.getType(ctx.typeExpression())
             val subdecls = ctx.varSubDeclaration()?.mapNotNull { v -> handleSubDeclaration(type, v) } ?: listOf()
             SimpleVariableDeclaration(type, subdecls)
         }
@@ -51,7 +51,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
                     errorLogger.structureError(ctx, "missing tuple member name")
                 }
             } ?: listOf()
-            val value = valueVisitor.getValue(ctx.valueExpression())
+            val value = p.getValue(ctx.valueExpression())
             VariableTupleDeconstruction(members, value)
         }
     }
@@ -66,9 +66,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
 
     private fun constructorInitialization(type: Type, ctx: VoidParser.CtorInitContext): Value {
         val args = ctx.valueExpression().mapNotNull {
-            it ?. let {
-                valueVisitor.getValue(it)
-            } ?: run {
+            it ?. let { p.getValue(it) } ?: run {
                 errorLogger.structureError(ctx, "value expression expected")
             }
         }
@@ -77,7 +75,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
 
     private fun piecewiseInitialization(type: Type, ctx: VoidParser.PiecewiseInitContext): Value {
         val members = ctx.piecewiseSubInit().mapNotNull {
-            v -> v ?. identifier() ?. text ?. let { VarSubDecl(it, valueVisitor.getValue(v.valueExpression())) } ?: run {
+            v -> v ?. identifier() ?. text ?. let { VarSubDecl(it, p.getValue(v.valueExpression())) } ?: run {
                 errorLogger.structureError(ctx, "invalid member initializer")
             }
         }
@@ -89,7 +87,7 @@ class VariableDeclarationVisitor(private val errorLogger: ErrorLogger, tV: TypeV
         return ctx?.run {
             val name = ctx.identifier()?.Name()?.text
             val value = ctx.varDeclInit()?.let { it ->
-                it.valueExpression() ?. let { i -> valueVisitor.getValue(i)} ?:
+                it.valueExpression() ?. let { i -> p.getValue(i)} ?:
                 it.declInit() ?. let { i -> indirectInitialization(type, i) } ?:
                 InvalidValue(it)
             }

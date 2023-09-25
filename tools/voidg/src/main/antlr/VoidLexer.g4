@@ -59,6 +59,8 @@ Arrow: '->';
 Return: 'ret';
 Question: '?';
 Colon: ':';
+If: 'if';
+Else: 'else';
 
 //keywords
 Var: 'var';

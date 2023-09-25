@@ -2,11 +2,10 @@ package parsing.structure.values
 
 import org.antlr.v4.runtime.ParserRuleContext
 import parsing.structure.expressions.Block
-import parsing.structure.expressions.Expression
 import parsing.structure.types.Type
 import parsing.structure.types.TypeAuto
 
-class LambdaFunction(val args: List<ArgDef>, val returnType: Type, val body: Block, ctx: ParserRuleContext): Value(ctx) {
+class Function(val args: List<ArgDef>, val returnType: Type, val body: Block, val isLambda: Boolean, ctx: ParserRuleContext): Value(ctx) {
     class ArgDef(val type: Type, val name: String) {
         override fun toString(): String {
             return "$type $name"

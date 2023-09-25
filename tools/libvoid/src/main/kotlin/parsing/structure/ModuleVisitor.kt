@@ -2,14 +2,13 @@ package parsing.structure
 
 import VoidParser
 import VoidParserBaseVisitor
-import parsing.structure.variables.VariableDeclarationVisitor
 
 class ModuleVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
     val errorLogger = ErrorLogger(dataSource ?: "input")
 
     private var module: Module? = null
 
-    private val variableVisitor = VariableDeclarationVisitor(errorLogger)
+    private val pack = VisitorPack(errorLogger)
 
     fun getModule(): Module {
         return module ?: Module("main")
@@ -37,12 +36,13 @@ class ModuleVisitor(dataSource: String? = null): VoidParserBaseVisitor<Unit>() {
     }
 
     override fun visitVarDeclaration(ctx: VoidParser.VarDeclarationContext) {
-        val variableDeclaration = variableVisitor.visit(ctx)
-        variableDeclaration ?. also { requireModule().registerVariableDecl(it) }
+        val variableDeclaration = pack.getDeclaration(ctx)
+        requireModule().registerVariableDecl(variableDeclaration)
     }
 
     override fun visitFunctionDefinition(ctx: VoidParser.FunctionDefinitionContext) {
-        //
+        val functionDeclaration = pack.getFunction(ctx)
+        requireModule().registerFunction(functionDeclaration)
     }
 
     override fun visitClassDefinition(ctx: VoidParser.ClassDefinitionContext) {
