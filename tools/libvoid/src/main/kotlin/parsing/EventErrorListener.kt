@@ -1,7 +1,6 @@
 package parsing
 
 import VoidError
-import br.com.devsrsouza.eventkt.scopes.LocalEventScope
 import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.CommonToken
 import org.antlr.v4.runtime.RecognitionException
@@ -15,13 +14,11 @@ class SyntaxError(
     private val offendingSymbol: Any?,
     private val msg: String?
 ): VoidError(line, pos, source) {
-    override fun getErrorMsg(): String {
-        return "syntax error" +
-                when (offendingSymbol) {
-                    is CommonToken -> " - unexpected token \"${offendingSymbol.text}\""
-                    else -> msg
-                }
-    }
+    override fun getErrorMsg(): String = "syntax error" +
+            when (offendingSymbol) {
+                is CommonToken -> " - unexpected token \"${offendingSymbol.text}\""
+                else -> msg
+            }
 }
 
 class EventErrorListener(private val file: String? = null): BaseErrorListener() {
