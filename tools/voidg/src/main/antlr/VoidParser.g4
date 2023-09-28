@@ -5,223 +5,52 @@ options {
 
 //top level
 input: file;
-file: line* EOF;
+file: importStatements definitions EOF;
 
-line: topLevel | topLevel ExpressionSeparator;
+importStatements: importStatement*;
+importStatement: Import Name (Dot Name)*;
 
-topLevel:
-    declaration #topLevelDeclaration
-|   Import identifier #importDeclaration
-|   Module identifier #moduleDefinition;
+definitions: definition*;
 
-//declarations
-declaration: commonDeclaration;
-innerDeclaration: accessLevel? commonDeclaration;
+definition: traitDefinition | functionDefinition;
 
-accessLevel: Public | Private | Protected;
+traitDefinition: Trait Name genericArgumentsDefinition? traitScope;
+functionDefinition: functionDeclaration genericArgumentsDefinition? functionBodyDefinition;
 
-commonDeclaration: varDeclaration | functionDefinition | classDefinition | traitDefinition;
+functionBodyDefinition: valueFunctionBodyDefinition | fullFunctionBodyDefinition;
 
-//variable declarations
-varDeclaration:
-    cStyleVarDeclaration | extendedCStyleVarDeclaration | deconstructionVarDeclaration;
+valueFunctionBodyDefinition: Arrow valueExpression ExpressionSeparator;
+fullFunctionBodyDefinition: '{' expression*'}';
 
-cStyleVarDeclaration: typeExpression varSubDeclaration (Comma varSubDeclaration)*;
-extendedCStyleVarDeclaration: Var varSubDeclaration (Comma varSubDeclaration)*;
-deconstructionVarDeclaration: Var tupleDeconstructionDecl Assignment valueExpression;
+traitScope: '{' (functionDeclaration | propertyDeclaration)+ '}';
 
-//initialization
-varSubDeclaration: identifier varDeclInit?;
-varDeclInit: Assignment valueExpression | declInit;
+functionDeclaration: Name genericArgumentsDefinition? functionArgumentsDefinition ':' type;
+propertyDeclaration: Name ':' type '{' (Get | Set) (',' (Get | Set))* '}';
 
-declInit: ctorInit | piecewiseInit;
-ctorInit: CScopeOpen (valueExpression (Comma valueExpression)*)? CScopeClose;
+functionArgumentsDefinition: '(' (functionArgumentDefinition (',' functionArgumentDefinition)*)? ')';
+functionArgumentDefinition: Name ':' type;
 
-//deconstructing declarations
-tupleDeconstructionDecl: RScopeOpen identifier (Comma identifier)* RScopeClose;
+genericArgumentsDefinition: '<' Name (',' Name)* '>';
 
-//function definitions
-functionDefinition: cstyleFunctionDef | arrowFunctionDef;
+type: tupleType | normalType | optionalType;
 
-cstyleFunctionDef: functionDefSignature functionBody;
-arrowFunctionDef: functionDefSignature Arrow valueExpression;
+optionalType: basicType '?';
+normalType: basicType | functionType;
+basicType: namedType | tupleType | genericType; //TODO: support namespaces and nested types?
 
-functionDefSignature: typeExpression identifier templateArgs? argumentsDef;
+genericType: namedType genericArgumentsSpecification;
+functionType: (basicType | optionalType) Arrow type;
+tupleType: '(' type (',' type)* ')';
+namedType: Name;
 
-argumentsDef: RScopeOpen (argumentDef (Comma argumentDef)*)? RScopeClose;
-argumentDef: typeExpression identifier (Assignment valueExpression)?;
-functionBody: CScopeOpen ExpressionSeparator* ((expression | expression ExpressionSeparator))* ExpressionSeparator* CScopeClose | valueExpression;
-functionCallArgs: RScopeOpen (valueExpression (Comma valueExpression)*)? RScopeClose;
+genericArgumentsSpecification: '<' type (',' type)* '>';
 
-//type definitions
+expression: valueExpression; //TODO add non value expressions
+valueExpression: '(' valueExpression ')' | simpleValueExpression; //TODO add other value expression
 
-traitDefinition: Trait identifier templateArgs? traitBody;
+simpleValueExpression: constantValue | Name;
 
-traitBody: CScopeOpen (traitInnerDecl ExpressionSeparator?)* CScopeClose;
-traitInnerDecl: functionDefSignature;
+constantValue: constantStringValue | constantIntegerValue;
 
-classDefinition:
-    Class identifier templateArgs? classExtending? contextArgs? classBody;
-
-classBody:
-    CScopeOpen (accessBlockStart | innerDeclaration ExpressionSeparator?)* CScopeClose;
-
-accessBlockStart: accessLevel Colon;
-
-classExtending: Colon typeExpression (Comma typeExpression)*;
-
-templateArgs: Lt templateArg (Comma templateArg)* Gt;
-templateArg: identifier (Colon typeExpression)?;
-
-contextArgs: With contextArg (Comma contextArg)*;
-contextArg: identifier (As identifier)?;
-
-typeExpression:
-    typeSubExpression
-|   lambdaObjectType;
-typeSubExpression: typeTemplate | typeAccess;
-//|   typeOfFunction;
-typeTemplate: typeName (Lt typeExpression (Comma typeExpression)* Gt)?;
-typeAccess: typeTemplate Dot typeSubExpression;
-
-lambdaObjectType: CScopeOpen cStyleVarDeclaration ((Comma | ExpressionSeparator) cStyleVarDeclaration)* CScopeClose;
-//typeOfFunction: RScopeOpen typeExpression RScopeClose Arrow typeExpression;
-//expressions
-expression:
-    declaration
-|   valueExpression
-|   operationExpression
-|   scopeExpression;
-
-//scope expressions
-scopeExpression: 
-    CScopeOpen (expression ExpressionSeparator?)* CScopeClose #blockExp
-|   With ctorContext scopeExpression? #statedExp
-|   Stateless scopeExpression #statelessExp;
-
-//value expressions
-valueExpression: lambdaExpression;
-
-lambdaExpression:
-    assignmentExpression #assignmentPassThrough
-|   lambdaFunction #lambda;
-
-assignmentExpression:
-    logicalTopExpression #logicalTopPassThrough
-|   logicalExpression Assignment valueExpression #assignmentOp;
-
-logicalTopExpression:
-    ifElseOperatorExpression #ifElseOperatorPassThrough
-|   ifElseOperatorExpression logicalTopOperator logicalTopExpression #logicalTopOp;
-
-logicalTopOperator: LAnd | LOr;
-
-ifElseOperatorExpression:
-    logicalExpression #logicalPassThrough
-|   logicalExpression Question valueExpression Colon valueExpression #ifElseOp;
-
-logicalExpression:
-    binaryExpression #binaryPassThrough
-|   binaryExpression logicalOperator binaryExpression #logicalOp;
-
-logicalOperator: Eq | NotEq | Lt | Gt | Leq | Geq;
-
-binaryExpression:
-    shiftExpression #shiftPassThrough
-|   shiftExpression binaryOperator binaryExpression #binaryOp;
-
-binaryOperator: And | Or | Xor;
-
-shiftExpression:
-    additiveExpression #additivePassThrough
-|   additiveExpression shiftOperator shiftExpression #shiftOp;
-
-shiftOperator: Lt Lt | Gt Gt;
-
-additiveExpression:
-    multiplicativeExpression #multiplicativePassThrough
-|   multiplicativeExpression additiveOperator additiveExpression #additiveOp;
-
-additiveOperator: Plus | Minus;
-
-multiplicativeExpression:
-    castExpression #castPassThrough
-|   castExpression multOperator multiplicativeExpression #multiplicativeOp;
-
-multOperator: Mult | Divide | Modulo;
-
-castExpression:
-    unaryExpression #unaryPassthrough
-|   castExpression As typeExpression #asCast
-|   RScopeOpen typeExpression RScopeClose valueExpression #cCast;
-
-unaryExpression:
-    postfixExpression #postfixPassThrough
-|   unaryOperator unaryExpression #unaryOp;
-
-unaryOperator: MinusMinus | PlusPlus | Not | Neg;
-
-postfixExpression:
-    accessExpression #accessPassThrough
-|   postfixExpression postfixOperator #postfixOp;
-
-postfixOperator: MinusMinus | PlusPlus;
-
-accessExpression:
-    primaryExpression #primaryPassThrough
-|   accessExpression Dot variableExpression #memberAccess
-|   accessExpression functionCallArgs #functionCall;
-
-primaryExpression:
-    RScopeOpen valueExpression RScopeClose |
-    constantExpression |
-    lambdaObject |
-    lambdaTuple |
-    variableExpression |
-    ctorInvoke;
-
-variableExpression: identifier;
-
-constantExpression: numericConstant | stringConstant;
-
-piecewiseSubInit: Dot identifier Assignment valueExpression;
-piecewiseInit: CScopeOpen piecewiseSubInit (Comma piecewiseSubInit)* CScopeClose;
-
-//lambdas
-lambdaTuple: RScopeOpen valueExpression (Comma valueExpression)+ RScopeClose;
-
-lambdaObject: CScopeOpen lambdaObjectMember ((Comma | ExpressionSeparator) lambdaObjectMember)* CScopeClose;
-lambdaObjectMember: identifier Assignment valueExpression | typeExpression identifier;
-
-lambdaFunction:
-    typeExpression? RScopeOpen (lambdaFunctionArgDef (Comma lambdaFunctionArgDef)*)? RScopeClose Arrow functionBody #conventionalLambda
-|   identifier Arrow functionBody #simplifiedLambda;
-
-lambdaFunctionArgDef: typeExpression? identifier;
-
-//constructor calls
-ctorInvoke: typeExpression ctorInit (With ctorContext)?;
-ctorContext: (contextList | contextMap);
-
-contextList: valueExpression (Comma valueExpression)*;
-contextMap: CScopeOpen contextMapPart (Comma contextMapPart)* CScopeClose;
-contextMapPart: identifier Assignment valueExpression;
-
-//operations
-operationExpression:
-    Return valueExpression? #returnExpression
-|   ifElseExpression #ifElseExp;
-
-ifElseExpression:
-    If valueExpression expression (Else expression)??;
-
-//sub
-numericConstant: 
-    DecimalNumber |
-    HexadecimalNumber;
-
-stringConstant:
-    SimpleString;
-
-typeName: identifier;
-identifier: Name;
+constantStringValue: SimpleString;
+constantIntegerValue: DecimalNumber | HexadecimalNumber;

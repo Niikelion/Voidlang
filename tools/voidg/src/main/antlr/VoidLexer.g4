@@ -1,9 +1,9 @@
 lexer grammar VoidLexer;
 
-ExpressionSeparator: ';' | '\n';
 WhiteScape: [ \t\r\n]+ -> skip;
 BlockComment: '/*' .*? '*/' -> skip;
 LineComment: '//' ~ [\r\n]* -> skip;
+ExpressionSeparator: ';';
 
 //numeric fragments
 fragment DecDigit: [0-9];
@@ -63,17 +63,10 @@ If: 'if';
 Else: 'else';
 
 //keywords
-Var: 'var';
-Class: 'class';
-Struct: 'struct';
-Public: 'pub';
-Private: 'priv';
-Protected: 'prot';
-Virtual: 'virtual';
-With: 'with';
-Stateless: 'stateless';
-Trait: 'trait';
 Import: 'import';
-Module: 'module';
+Trait: 'trait';
+Get: 'get';
+Set: 'set';
+
 //qualifiers
 Name: [a-zA-Z_] ([a-zA-Z0-9_])*;
