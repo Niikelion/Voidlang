@@ -25,7 +25,9 @@ fullFunctionBodyDefinition: '{' expression*'}';
 traitScope: '{' (functionDeclaration | propertyDeclaration)+ '}';
 
 functionDeclaration: Name genericArgumentsDefinition? functionArgumentsDefinition ':' type;
-propertyDeclaration: Name ':' type '{' (Get | Set) (',' (Get | Set))* '}';
+propertyDeclaration: Name ':' type '{' propertySpecifier (',' propertySpecifier)* '}';
+
+propertySpecifier: Get | Set;
 
 functionArgumentsDefinition: '(' (functionArgumentDefinition (',' functionArgumentDefinition)*)? ')';
 functionArgumentDefinition: Name ':' type;
@@ -36,8 +38,10 @@ type: tupleType | normalType | optionalType;
 
 optionalType: basicType '?';
 normalType: basicType | functionType;
-basicType: namedType | tupleType | genericType; //TODO: support namespaces and nested types?
+basicType: simpleType | arrayType; //TODO: support namespaces and nested types?
+simpleType: namedType | tupleType | genericType;
 
+arrayType: arrayType '[' DecimalNumber? ']' | simpleType;
 genericType: namedType genericArgumentsSpecification;
 functionType: (basicType | optionalType) Arrow type;
 tupleType: '(' type (',' type)* ')';
@@ -46,9 +50,18 @@ namedType: Name;
 genericArgumentsSpecification: '<' type (',' type)* '>';
 
 expression: valueExpression; //TODO add non value expressions
-valueExpression: '(' valueExpression ')' | simpleValueExpression; //TODO add other value expression
+valueExpression: simpleValueExpression; //TODO add other value expression
 
-simpleValueExpression: constantValue | Name;
+simpleValueExpression: '(' valueExpression ')' | constantValue | namedValueExpression | functionCallExpression;
+
+accessValueExpression: simpleValueExpression | accessValueExpression '.' namedValueExpression; //TODO
+
+possibleMemberAccessExpression: ;//TODO
+
+arrayAccessExpression: simpleValueExpression '[' valueExpression ']';
+namedValueExpression: Name;
+functionCallExpression: Name genericArgumentsSpecification? functionCallArguments;
+functionCallArguments: '(' (valueExpression (',' valueExpression)*)? ')';
 
 constantValue: constantStringValue | constantIntegerValue;
 
