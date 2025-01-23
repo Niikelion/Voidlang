@@ -1,4 +1,0 @@
-package compiling
-
-class Compiler {
-}
