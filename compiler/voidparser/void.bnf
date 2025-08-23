@@ -1,0 +1,64 @@
+entrypoints Code;
+
+comment "//";
+comment "/*" "*/";
+
+Void.           Code            ::= [TopDef];
+
+separator nonempty TopDef "";
+FunDef.         TopDef          ::= "fun" Ident "(" [ArgumentDef] ")" ":" Type FunBody;
+
+separator ArgumentDef ",";
+ArgDef.         ArgumentDef     ::= Ident ":" Type;
+
+BlockBody.      FunBody         ::= StmtBlock;
+ExpBody.        FunBody         ::= "=>" Stmt;
+
+separator ArgType ",";
+AType.          ArgType       ::= Type;
+
+separator nonempty Type ",";
+
+_.              Type            ::= Type1;
+_.              Type1           ::= Type2;
+_.              Type2           ::= Type3;
+_.              Type3           ::= Type4;
+TBool.          Type3           ::= "bool";
+TInt.           Type3           ::= "int";
+TString.        Type3           ::= "string";
+TVoid.          Type3           ::= "void";
+TNamed.         Type3           ::= Ident;
+TArray.         Type2           ::= Type2 "[]";
+TUnion.         Type            ::= Type2 "|" Type;
+TFunc.          Type1           ::= Type4 "->" Type;
+TOptional.      Type1           ::= Type2 "?";
+TTuple.         Type4           ::= "(" [Type] ")";
+
+Block.          StmtBlock       ::= "{" [Stmt] "}";
+
+[].             [Stmt]          ::= ;
+(:).            [Stmt]          ::= Stmt "\n" [Stmt];
+(:).            [Stmt]          ::= Stmt ";" [Stmt];
+SBlock.         Stmt            ::= StmtBlock;
+SReturn.        Stmt            ::= "return" Exp;
+SVoidReturn.    Stmt            ::= "return";
+SExp.           Stmt            ::= Exp;
+
+separator nonempty Exp ",";
+
+_.              Exp             ::= Exp1;
+_.              Exp1            ::= Exp2;
+_.              Exp2            ::= Exp3;
+_.              Exp3            ::= Exp4;
+EInt.           Exp3            ::= Integer;
+EString.        Exp3            ::= String;
+ETrue.          Exp3            ::= "true";
+EFalse.         Exp3            ::= "false";
+EVar.           Exp3            ::= Ident;
+ECall.          Exp2            ::= Exp2 Exp4;
+EBinOp.         Exp             ::= Exp1 Op Exp;
+EPrefOp.        Exp1            ::= Op Exp1;
+EPostOp.        Exp             ::= Exp1 Op;
+ETuple.         Exp4            ::= "(" [Exp] ")";
+
+token Op ["<>=/^&%$!|-+*"]+;

@@ -34,3 +34,6 @@
 .vs
 .idea
 build
+dist-newstyle
+*.local
+**.bak

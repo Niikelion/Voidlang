@@ -1,0 +1,81 @@
+cabal-version:      3.0
+
+-- The name of the package.
+name:               voidc
+
+-- The package version.
+-- See the Haskell package versioning policy (PVP) for standards
+-- guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:     +-+------- breaking API changes
+--                  | | +----- non-breaking API additions
+--                  | | | +--- code changes with no API change
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- The license under which the package is released.
+license:            MIT
+
+-- The file containing the license text.
+license-file:       LICENSE
+
+-- The package author(s).
+author:             Niikelion
+
+-- An email address to which users can send suggestions, bug reports, and patches.
+maintainer:         michal.osinski101@gmail.com
+
+-- A copyright notice.
+-- copyright:
+category:           Development
+build-type:         Simple
+
+-- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
+extra-doc-files:    README.md
+
+common shared
+    default-language: GHC2021
+    ghc-options: -Wall
+    build-depends: base >= 4.17.2.0, array, containers, mtl, hashable >= 1, transformers, lens, uniplate
+
+executable voidc
+    import: shared
+    main-is: Main.hs
+    build-depends: optparse-applicative, VoidParser, VoidIR, VoidCompile
+    hs-source-dirs: voidc
+
+executable voidpsetup
+    import: shared
+    build-depends: base, process
+    build-tool-depends: BNFC:bnfc, alex:alex >= 3.5, happy:happy
+    main-is: Generate.hs
+    hs-source-dirs: voidparser
+
+library VoidAst
+    import: shared
+    exposed-modules: Void.Ast
+    hs-source-dirs: voidast
+
+library VoidParser
+    import: shared
+    exposed-modules: Void.Parser
+    other-modules: Void.Abs, Void.ErrM, Void.Par, Void.Lex, Void.Print, Void.Module, Void.Rebalance
+    hs-source-dirs: voidparser
+    build-depends: VoidAst
+
+library VoidIR
+    import: shared
+    exposed-modules: Void.IR
+    hs-source-dirs: voidir
+
+library VoidCompile
+    import: shared
+    exposed-modules: Void.Compile
+    other-modules: Void.Trans
+    build-depends: VoidParser, VoidIR, VoidAst
+    hs-source-dirs: voidcompile
