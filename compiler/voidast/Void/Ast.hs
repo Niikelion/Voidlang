@@ -8,8 +8,6 @@ type TypeId = Int
 type EntityId = Int
 
 type EntityInfo = (String, Int)
-instance EntityData a => Named a where nameOf = fst . entityInfo
-instance EntityData a => Identifiable a where idOf = snd . entityInfo
 
 class EntityData a where entityInfo :: a -> EntityInfo
 class Named a where nameOf :: a -> String
@@ -93,6 +91,8 @@ instance Typed Arg where typeOf (Arg _ t _) = t
 instance Show Arg where
     show (Arg info t v) = entityDebugName info ++ ": " ++ show t ++ (maybe "" ((" = " ++) . show) v)
 instance EntityData Arg where entityInfo (Arg info _ _) = info
+instance Named Arg where nameOf = fst . entityInfo
+instance Identifiable Arg where idOf = snd . entityInfo
 
 data Entity
     = EFunction EntityInfo Type [Arg] Statement
@@ -132,6 +132,8 @@ instance EntityData Entity where
     entityInfo (EVariable info _) = info
     entityInfo (EExternal info _) = info
     entityInfo (EUnresolved info _ _) = info
+instance Named Entity where nameOf = fst . entityInfo
+instance Identifiable Entity where idOf = snd . entityInfo
 
 entityDebugName :: EntityInfo -> String
 entityDebugName (n, i) = n ++ "@" ++ show i

@@ -1,35 +1,43 @@
 module Void.Compile(compileModule) where
 
-import qualified Void.Parser as Parser
 import qualified Void.Ast as Ast
 import qualified Void.IR as IR
+import qualified Void.Analyse as Analyser
+import qualified Void.Analyse.Setup as Setup
 import qualified Data.Map as Map
 import Control.Monad.Identity
 import Control.Monad.State
 import Void.Trans
 import Data.Generics.Uniplate.Operations (transformBi)
 
-globalName :: Parser.Entity -> String
-globalName e@(Parser.EExternal {}) = Ast.nameOf e
+globalName :: Ast.Entity -> String
+globalName e@(Ast.EExternal {}) = Ast.nameOf e
+globalName (Ast.EFunction ("main", _) _ _ _) = "main"
 globalName e = (Ast.nameOf e) ++ "$" ++ (Ast.mangle $ Ast.typeOf e)
 
-compileModule :: Parser.Module -> IR.Module
-compileModule (Parser.Code entities) = IR.Module definitions
+fixBlocks :: [IR.Block] -> [IR.Block]
+fixBlocks = reverse . (map $ transformBi reverseInstrs)
+    where
+        reverseInstrs :: [IR.Instr] -> [IR.Instr]
+        reverseInstrs = reverse
+
+compileModule :: Setup.SetupState -> Analyser.Module -> IR.Module
+compileModule s (Analyser.Code entities) = IR.Module definitions
     where
         entityList = map snd $ Map.toList entities
         runGlobal = (flip evalState $ GlobalEmitState entities) . runGlobalEmitT
-        definitions = runGlobal $ emitEntities entityList
+        definitions = runGlobal $ emitEntities (Setup._implementations s) entityList
 
 type GlobalEmit a = GlobalEmitT Identity a
 type Emit m a = LocalEmitT (GlobalEmitT m) a
 
-emitEntities :: [Parser.Entity] -> GlobalEmit [IR.Def]
-emitEntities = mapM emitEntity
+emitEntities :: Map.Map Int IR.Def -> [Ast.Entity] -> GlobalEmit [IR.Def]
+emitEntities impls = mapM $ \e -> maybe (emitEntity e) return $ Map.lookup (Ast.idOf e) impls
 
-emitEntity :: Parser.Entity -> GlobalEmit IR.Def
-emitEntity e@(Parser.EFunction _ ret args stmt) = do
-    ret' <- mapType ret
-    argTypes <- mapM (mapType . Ast.typeOf) args
+emitEntity :: Ast.Entity -> GlobalEmit IR.Def
+emitEntity e@(Ast.EFunction _ ret args stmt) = do
+    let ret' = IR.typeOf ret
+    let argTypes = map (IR.typeOf . Ast.typeOf) args
     let sig = IR.Fun ret' argTypes
     (args', resultState) <- runLocal $ do
         args' <- mapM (\arg -> do
@@ -41,36 +49,13 @@ emitEntity e@(Parser.EFunction _ ret args stmt) = do
         startLocalBlock blockId
         emitStatement stmt
         return args'
-    return $ IR.FunDef sig args' (globalName e) $ ensureSSA [0..argCount-1] $ reverse $ map (transformBi reverseInstrs) $ localBlocks resultState
+    let blocks = fixBlocks $ localBlocks resultState
+    return $ IR.FunDef sig args' (globalName e) $ ensureSSA [0..argCount-1] blocks
     where
-        reverseInstrs :: [IR.Instr] -> [IR.Instr]
-        reverseInstrs = reverse
         argCount = length args
         runLocal = (flip runStateT $ emptyLocalState 0) . runLocalEmitT
-emitEntity e@(Parser.EExternal _ t) = do
-    t' <- mapType t
-    return $ IR.ExtDef t' $ Ast.nameOf e
+emitEntity e@(Ast.EExternal _ t) = return $ IR.ExtDef (IR.typeOf t) $ Ast.nameOf e
 emitEntity _ = error "entities other than functions not supported"
-
-mapType :: Monad m => Ast.Type -> GlobalEmitT m IR.Type
-mapType (Ast.TVoid) = return IR.Void
-mapType (Ast.TBool) = return IR.boolType
-mapType (Ast.TInt) = return IR.intType
-mapType (Ast.TString) = return IR.stringType
-mapType (Ast.TOptional t) = do -- TODO: register struct and make exception for pointers
-    t' <- mapType t
-    return $ IR.Struct [IR.boolType, t']
-mapType (Ast.TUnion _) = error "unions not supported"
-mapType (Ast.TArray t) = do
-    t' <- mapType t
-    return $ IR.arrayType t'
-mapType (Ast.TName i) = return $ IR.Class $ show i
-mapType (Ast.TStruct members) = mapM (\(Ast.TStructMember _ t) -> mapType t) members >>= (return . IR.Struct)
-mapType (Ast.TFunction ret args) = do
-    ret' <- mapType ret
-    args' <- mapM mapType args
-    return $ IR.Fun ret' args'
-mapType (Ast.TTuple args) = mapM mapType args >>= (return . IR.Struct)
 
 emitStatement :: Monad m => Ast.Statement -> Emit m ()
 emitStatement (Ast.SBlock stmts _) = mapM_ emitStatement stmts
@@ -87,7 +72,7 @@ emitExpression (Ast.EBool v) = return $ IR.bool v
 emitExpression (Ast.EInt v) = return $ IR.int v
 emitExpression (Ast.EString _) = error "string expressions not supported"
 emitExpression (Ast.ENamed (_, targetId) t) = do
-    t' <- lift $ mapType t
+    let t' = IR.typeOf t
     findGlobalEntity targetId >>= \e -> case e of
         Nothing -> mapGlobalToLocal targetId >>= return . (IR.VLocal t')
         Just e' -> return $ IR.VGlobal t' $ globalName e'
@@ -106,7 +91,7 @@ ir instrs = modifyLocalState $ \s -> s { localBlocks = insertToTop $ localBlocks
         insertToTop [] = error "cannot insert instruction when no block is present"
         insertToTop (h:t) = ((flip transformBi) h $ ((reverse instrs) ++)):t
 
-findGlobalEntity :: Monad m => Parser.EntityId -> Emit m (Maybe Parser.Entity)
+findGlobalEntity :: Monad m => Ast.EntityId -> Emit m (Maybe Ast.Entity)
 findGlobalEntity entityId = globalState $ \s -> Map.lookup entityId $ entities s
 
 globalState :: Monad m => (GlobalEmitState -> a) -> Emit m a
@@ -126,14 +111,14 @@ freshLocalBlockId :: Monad m => Emit m Int
 freshLocalBlockId = localState $ \s ->
         let n = nextLocalBlockId s in (n, s { nextLocalBlockId = n + 1 })
 
-mapGlobalToLocal :: Monad m => Parser.EntityId -> Emit m Int
+mapGlobalToLocal :: Monad m => Ast.EntityId -> Emit m Int
 mapGlobalToLocal entityId = do
     result <- getLocalState $ \s -> Map.lookup entityId $ globalLocalMapping s
     case result of
         Nothing -> error "internal error, missing global -> local mapping"
         Just localId -> return localId
 
-insertGlobalLocalMapping :: Monad m => Parser.EntityId -> Int -> Emit m ()
+insertGlobalLocalMapping :: Monad m => Ast.EntityId -> Int -> Emit m ()
 insertGlobalLocalMapping entityId localId = modifyLocalState $ \s -> s {
         globalLocalMapping = Map.insert entityId localId $ globalLocalMapping s
     }
@@ -148,7 +133,7 @@ localState :: Monad m => (LocalEmitState -> (a, LocalEmitState)) -> Emit m a
 localState = LocalEmitT . state
 
 data LocalEmitState = LocalEmitState {
-    globalLocalMapping :: Map.Map Parser.EntityId Int,
+    globalLocalMapping :: Map.Map Ast.EntityId Int,
     nextLocalEntityId :: Int,
     nextLocalBlockId :: Int,
     localBlocks :: [IR.Block]
@@ -163,7 +148,7 @@ newtype LocalEmitT m a = LocalEmitT {
 instance MonadTrans LocalEmitT where lift = LocalEmitT . lift
 
 data GlobalEmitState = GlobalEmitState {
-    entities :: Map.Map Parser.EntityId Parser.Entity
+    entities :: Map.Map Ast.EntityId Ast.Entity
 }
 
 newtype GlobalEmitT m a = GlobalEmitT {

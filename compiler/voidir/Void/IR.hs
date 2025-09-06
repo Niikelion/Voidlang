@@ -134,6 +134,10 @@ stripPointer :: Type -> Type
 stripPointer (Pointer t) = t
 stripPointer _ = error "not a pointer type"
 
+returnType :: Type -> Type
+returnType (Fun ret _) = ret
+returnType _ = error "not a function type"
+
 instance Show Type where
     show t = case t of
         Void -> "void"
@@ -165,7 +169,7 @@ instance Typed Exp where
     typeOf exp = case exp of
         EOp _ v _ -> typeOf v
         EComp {} -> boolType
-        ECall t _ _ -> t
+        ECall t _ _ -> returnType t
         EPhi t _ -> t
         EVal v -> typeOf v
         ECast _ t -> t

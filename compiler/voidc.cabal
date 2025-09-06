@@ -46,7 +46,8 @@ common shared
 executable voidc
     import: shared
     main-is: Main.hs
-    build-depends: optparse-applicative, VoidParser, VoidIR, VoidCompile
+    build-depends: optparse-applicative, VoidParser, VoidAnalyse, VoidCompile, VoidIR, VoidAst, filepath, process
+    other-modules: Void.Platform
     hs-source-dirs: voidc
 
 executable voidpsetup
@@ -61,10 +62,17 @@ library VoidAst
     exposed-modules: Void.Ast
     hs-source-dirs: voidast
 
+library VoidAnalyse
+    import: shared
+    exposed-modules: Void.Analyse, Void.Analyse.Module, Void.Analyse.Rebalance, Void.Analyse.Setup, Void.Analyse.Error
+    other-modules: Void.Analyse.Context
+    hs-source-dirs: VoidAnalyse
+    build-depends: VoidAst, VoidParser, VoidIR
+
 library VoidParser
     import: shared
     exposed-modules: Void.Parser
-    other-modules: Void.Abs, Void.ErrM, Void.Par, Void.Lex, Void.Print, Void.Module, Void.Rebalance
+    other-modules: Void.Abs, Void.ErrM, Void.Par, Void.Lex, Void.Print
     hs-source-dirs: voidparser
     build-depends: VoidAst
 
@@ -77,5 +85,5 @@ library VoidCompile
     import: shared
     exposed-modules: Void.Compile
     other-modules: Void.Trans
-    build-depends: VoidParser, VoidIR, VoidAst
+    build-depends: VoidIR, VoidAst, VoidAnalyse
     hs-source-dirs: voidcompile

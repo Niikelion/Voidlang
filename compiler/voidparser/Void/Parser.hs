@@ -1,21 +1,15 @@
 module Void.Parser(
-    Module(..),
     parseCode,
-    moduleFromCode,
-    Ast.EntityId,
-    Ast.EntityInfo,
-    Ast.Entity(..),
+    module Void.Abs
 ) where
 
-import qualified Void.Ast as Ast
-import qualified Void.Abs as Abs
-import qualified Void.Par as Par
-import qualified Void.Lex as Lex
-
-import Void.Module(moduleFromCode, Module(..))
+import Void.Abs
+import Void.Par(pCode)
+import Void.Lex(tokens)
 import Control.Monad.Except (ExceptT, throwError)
 
-parseCode :: Monad m => String -> ExceptT String m Abs.Code
-parseCode source = do
-    let result = Par.pCode $ Lex.tokens source
-    either (throwError) return result
+parse :: String -> Either String Code
+parse = pCode . tokens
+
+parseCode :: Monad m => String -> ExceptT String m Code
+parseCode source = either (throwError) return $ parse source
