@@ -8,9 +8,9 @@ module Void.Platform(
 
 import Control.Monad.Trans(lift)
 import System.Info(os)
-import System.FilePath(dropExtension,(<.>))
+import System.FilePath(dropExtension,dropFileName,(<.>))
 import System.Exit(ExitCode(..))
-import System.Process(readCreateProcessWithExitCode, callProcess, proc)
+import System.Process(readCreateProcessWithExitCode, callProcess, proc, readProcess)
 import Control.Monad.Except(ExceptT, throwError)
 import Data.List(intercalate)
 
@@ -53,20 +53,29 @@ writeObjectFile sourceFile content = do
                 stderrOutput
             ]
 
-lldOptions :: String -> LinkType -> [String] -> [String]
+lldOptions :: String -> LinkType -> [String] -> ExceptT String IO [String]
 lldOptions outFile _ sources = case platform of
-    Windows -> [
+    Windows -> return $ [
             "-flavor", "link",
             "/OUT:" ++ outFile
-        ] ++ sources ++ [ "libcmt.lib" ]
-    Linux -> [
-            "-flavor", "gnu",
-            "-o", outFile
-        ] ++ sources
+        ] ++ sources ++ [ "libcmt.lib", "kernel32.lib" ]
+    Linux -> do
+        clibs <- mapM (lift . gccPath) [ "crt1.o", "crti.o", "crtn.o" ]
+        libgcc <- lift $ gccPath "libgcc.o"
+        let libdir = dropFileName libgcc
+        return $ [
+                "-flavor", "gnu",
+                "-o", outFile,
+                "-L" ++ libdir,
+                "-lc", "-lgcc"
+            ] ++ sources
+        where
+            gccPath :: String -> IO String
+            gccPath name = do
+                path <- readProcess "gcc" ["-print-file-name=" ++ name] ""
+                return $ init path
 
 link :: String -> LinkType -> [String] -> ExceptT String IO ()
 link outFile lk sources = do
-    case lk of
-        App -> lift $ callProcess "lld" $ lldOptions outFile lk sources
-        Static -> error "not implemented"
-        Dynamic -> error "not implemented"
+    options <- lldOptions outFile lk sources
+    lift $ callProcess "lld" options

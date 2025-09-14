@@ -14,7 +14,7 @@ import Control.Monad
 import Control.Monad.Identity
 import Data.Functor((<&>))
 import Prelude hiding (exp)
-import Data.Generics.Uniplate.Operations (transformBiM)
+import Data.Generics.Uniplate.Operations (transformBiM, transformBi)
 
 data BlockData = BlockData {
     liveLocals :: Set.Set IR.Val,
@@ -92,7 +92,6 @@ ensureSSA funArgs originalBlocks = runIdentity $ do
             let applySteps = [
                     mapM insertMappingData,
                     mapM remapIds,
-                    return . removeAliasing,
                     return . optimize
                     ]
             mapM_ ((flip mapM_) blocks) extractSteps
@@ -326,5 +325,15 @@ reducePhis blocks = let
                 _ -> return v
             return (s, v')
 
+trimVoidCalls :: [IR.Block] -> [IR.Block]
+trimVoidCalls = map trimVoidCallsInBlock
+    where
+        trimVoidCallsInBlock :: IR.Block -> IR.Block
+        trimVoidCallsInBlock = transformBi trimVoidCall
+
+        trimVoidCall :: IR.Instr -> IR.Instr
+        trimVoidCall (IR.IAssign _ e@(IR.ECall (IR.Fun IR.Void _) _ _)) = IR.IExp e
+        trimVoidCall i = i
+
 optimize :: [IR.Block] -> [IR.Block]
-optimize = foldl (flip (.)) id [reducePhis, removeAliasing]
+optimize = foldl (flip (.)) id [reducePhis, removeAliasing, trimVoidCalls]

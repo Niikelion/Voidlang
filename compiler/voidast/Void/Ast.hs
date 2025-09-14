@@ -79,6 +79,31 @@ unionTypes :: Type -> Set.Set Type
 unionTypes (TUnion m) = m
 unionTypes t = Set.singleton t
 
+flatUnionType :: Type -> Type -> Type
+flatUnionType a b = simplifyUnion $ TUnion $ Set.fromList [a, b]
+
+simplifyUnion :: Type -> Type
+simplifyUnion (TUnion m) = case keepers of
+    [] -> TVoid -- Should not happen, just in case
+    [x] -> x
+    xs -> TUnion $ Set.fromList xs
+    where
+        flatten :: Set.Set Type -> Set.Set Type
+        flatten = (foldl (\acc -> (Set.union acc) . flatten . unionTypes) Set.empty) . Set.toList
+
+        flat :: [Type]
+        flat = Set.toList $ flatten m
+
+        isStrictlyCoveredBy :: Type -> Type -> Bool
+        isStrictlyCoveredBy wider narrower = assignable wider narrower && not (assignable narrower wider)
+
+        dominated :: Type -> Bool
+        dominated t = any (\u -> u /= t && isStrictlyCoveredBy u t) flat
+
+        keepers :: [Type]
+        keepers = filter (not . dominated) flat
+simplifyUnion t = t
+
 assignable :: Type -> Type -> Bool
 assignable a (TUnion m) = all (assignable a) m
 assignable (TUnion m) a' = any ((flip assignable) a') m
@@ -94,7 +119,7 @@ instance EntityData Arg where entityInfo (Arg info _ _) = info
 instance Named Arg where nameOf = fst . entityInfo
 instance Identifiable Arg where idOf = snd . entityInfo
 
-data Entity
+data Entity -- TODO: remove
     = EFunction EntityInfo Type [Arg] Statement
     | EClass EntityInfo [(String, Type)] --TODO: add bodies to methods
     | EVariable EntityInfo Type
@@ -147,16 +172,19 @@ data Statement
     = SBlock StatementBlock Bool
     | SReturn (Maybe Expression)
     | SExpression Expression
+    | SIf Expression Statement (Maybe Statement)
 instance Show Statement where
-    show (SBlock statements _) = unlines [ "{", indent . intercalate "\n" $ map show statements, "}" ]
+    show s = case s of
+        SBlock statements _ -> unlines [ "{", indent . intercalate "\n" $ map show statements, "}" ]
+        SReturn v -> "return" ++ maybe "" ((" " ++) . show) v
+        SExpression e -> show e
+        SIf e t f -> "if (" ++ show e ++ ") " ++ show t ++ (maybe "" (("\nelse " ++) . show) f)
         where
             indent :: String -> String
-            indent s = intercalate "\n" $ map ((++) "    ") $ lines s
-    show (SReturn (Just e)) = "return " ++ show e
-    show (SReturn Nothing) = "return"
-    show (SExpression e) = show e
+            indent = intercalate "\n" . (map ((++) "    ")) . lines
 instance Typed Statement where
     typeOf e@(SExpression {}) = typeOf e
+    typeOf (SIf _ t (Just f)) = flatUnionType (typeOf t) (typeOf f)
     typeOf _ = TVoid
 
 ensureClosedBlock :: Statement -> Statement

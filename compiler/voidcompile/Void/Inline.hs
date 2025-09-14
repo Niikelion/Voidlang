@@ -1,0 +1,1 @@
+module Void.Inline where

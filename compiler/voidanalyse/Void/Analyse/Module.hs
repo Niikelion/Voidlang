@@ -1,17 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Void.Analyse.Module (moduleFromCode, Module(..)) where
+module Void.Analyse.Module (moduleFromCode, Module'(..)) where
 
 import Void.Ast
 import qualified Void.Analyse.Rebalance as Rebalance
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.State(gets, modify)
 import Control.Monad.Except(ExceptT, MonadError(throwError))
 import Data.Maybe(isJust)
 import Control.Monad
 import Data.Functor((<&>))
-import Control.Lens((^.), (&), (%~), to)
+import Control.Lens((^.), (&), (%~))
 import qualified Void.Parser as Abs
 import Void.Analyse.Context
 import qualified Void.Analyse.Setup as Setup
@@ -20,8 +19,8 @@ import Void.Analyse.Error
 notInScope :: String -> CodeError
 notInScope name = semanticErr ("could not find " ++ name) Nothing
 
-data Module = Code (Map.Map EntityId Entity)
-instance Show Module where
+data Module' = Code (Map.Map EntityId Entity)
+instance Show Module' where
     show (Code e) = unlines $ map (("\n" ++) . show . snd) $ Map.toList e
 
 stateFromSetup :: Setup.SetupState -> AnalyserState
@@ -31,7 +30,7 @@ stateFromSetup s = AnalyserState 1 entities precedences $ NE.singleton globalSco
         precedences = Setup._operatorPrecedences s
         globalScope = Setup._globalScope s
 
-moduleFromCode :: Monad m => Abs.Code -> Setup.SetupState -> ExceptT String m Module
+moduleFromCode :: Monad m => Abs.Code -> Setup.SetupState -> ExceptT String m Module'
 moduleFromCode (Abs.Void _ defs) s = do
     let result = execAnalyser (stateFromSetup s) $ do
             mapM_ forwardDeclareTopEntity defs
@@ -82,31 +81,6 @@ resolveArgDef (Abs.ArgDef _ (Abs.Ident name) t) = do
     entityId <- declareEntity name $ \entityId -> EVariable (name, entityId) argType
     return $ Arg (name, entityId) argType Nothing
 
-flatUnionType :: Type -> Type -> Type
-flatUnionType a b = simplifyUnion $ TUnion $ Set.fromList [a, b]
-
-simplifyUnion :: Type -> Type
-simplifyUnion (TUnion m) = case keepers of
-    [] -> TVoid -- Should not happen, just in case
-    [x] -> x
-    xs -> TUnion $ Set.fromList xs
-    where
-        flatten :: Set.Set Type -> Set.Set Type
-        flatten = (foldl (\acc -> (Set.union acc) . flatten . unionTypes) Set.empty) . Set.toList
-
-        flat :: [Type]
-        flat = Set.toList $ flatten m
-
-        isStrictlyCoveredBy :: Type -> Type -> Bool
-        isStrictlyCoveredBy wider narrower = assignable wider narrower && not (assignable narrower wider)
-
-        dominated :: Type -> Bool
-        dominated t = any (\u -> u /= t && isStrictlyCoveredBy u t) flat
-
-        keepers :: [Type]
-        keepers = filter (not . dominated) flat
-simplifyUnion t = t
-
 resolveType :: Abs.Type -> Analyser Type
 resolveType (Abs.TVoid _) = return TVoid
 resolveType (Abs.TBool _) = return TBool
@@ -135,7 +109,7 @@ resolveType (Abs.TTuple _ elements) = do
 resolveStatement :: Abs.Stmt -> Analyser Statement
 resolveStatement (Abs.SBlock _ block) = resolveBlock block
 resolveStatement (Abs.SExp _ e) = resolveExpression e <&> SExpression
-resolveStatement (Abs.SReturn _ e) = do
+resolveStatement (Abs.SReturn _ e) = do -- TODO: move from type equality to assignability
     e' <- resolveExpression e
     t' <- scoped gets _scopeReturnType
     when (typeOf e' /= t') $ throwE $ typeErr "type does not match" Nothing
@@ -144,6 +118,22 @@ resolveStatement (Abs.SReturn _ e) = do
 resolveStatement (Abs.SVoidReturn _) = do
     closeCurrentScope
     return $ SReturn Nothing
+resolveStatement (Abs.SIf _ e t) = do -- TODO: check expression type
+    e' <- resolveExpression e
+    pushScope
+    t' <- resolveStatement t
+    void popScope
+    return $ SIf e' t' Nothing
+resolveStatement (Abs.SIfElse _ e t f) = do -- TODO: check expression type
+    e' <- resolveExpression e
+    pushScope
+    t' <- resolveStatement t
+    tClosed <- popScope <&> (^.scopeClosed)
+    pushScope
+    f' <- resolveStatement f
+    fClosed <- popScope <&> (^.scopeClosed)
+    when (tClosed && fClosed) closeCurrentScope
+    return $ SIf e' t' $ Just f'
 
 resolveExpression :: Abs.Exp -> Analyser Expression
 resolveExpression (Abs.ETrue _) = return $ EBool True
@@ -229,29 +219,28 @@ declareEntity name factory = do
 
 getPrecedence :: Positional a => a -> String -> Analyser Int
 getPrecedence a name = do
-    prec <- global gets (^.operatorPrecedences.to (Map.lookup name))
+    prec <- global gets (^.operatorPrecedences) <&> Map.lookup name
     maybe (at a throwE $ notInScope name) return prec
 
 insertOperator :: Positional a => a -> String -> Int -> Analyser ()
 insertOperator a name precedence = do
-    prec <- global gets (^.operatorPrecedences.to (Map.lookup name))
+    prec <- global gets (^.operatorPrecedences) <&> Map.lookup name
     when (isJust prec) $ at a throwE $ semanticErr ("precedence for operator " ++ name ++ " was already defined") Nothing
     global modify (& operatorPrecedences %~ Map.insert name precedence)
 
 insertEntity :: Entity -> Analyser ()
-insertEntity entity = let (_, entityId) = entityInfo entity in
-    global modify (& resolverEntities %~ Map.insert entityId entity)
+insertEntity entity = global modify (& resolverEntities %~ Map.insert (idOf entity) entity)
 
 findEntityByName :: String -> Analyser (Maybe Entity)
 findEntityByName name = do
-    target <- global gets $ findIdOnStack . NE.toList . _scopeStack
+    target <- global gets (^.scopeStack) <&> NE.toList <&> findIdOnStack
     maybe (return Nothing) findEntityById target
     where
         findIdOnStack :: [Scope] -> Maybe EntityId
         findIdOnStack [] = Nothing
-        findIdOnStack (h:t) = case (Map.lookup name $ _nameMapping h) of
+        findIdOnStack (h:t) = case (Map.lookup name $ h^.nameMapping) of
             Nothing -> findIdOnStack t
             Just entityId -> Just entityId
 
 findEntityById :: EntityId -> Analyser (Maybe Entity)
-findEntityById entityId = global gets $ (Map.lookup entityId) . _resolverEntities
+findEntityById entityId = global gets (^.resolverEntities) <&> Map.lookup entityId

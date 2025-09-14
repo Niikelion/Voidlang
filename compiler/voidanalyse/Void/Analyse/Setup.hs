@@ -8,7 +8,6 @@ import qualified Void.Analyse.Context as Context
 import Control.Monad.State(State, modify, execState)
 import qualified Void.Ast as Ast
 import qualified Void.IR as IR
-import Data.List
 
 instance IR.Typed Ast.Type where
     typeOf t = case t of
@@ -57,7 +56,10 @@ implementFunction entity body = do
     let impl = IR.FunDef (IR.typeOf sig) [0 .. argCount - 1] (Ast.nameOf entity) body
     modify (& implementations %~ Map.insert entityId impl)
 
+exposeEntity :: Ast.Entity -> String -> Setup ()
+exposeEntity entity name = modify (& globalScope . Context.nameMapping %~ Map.insert name (Ast.idOf entity))
+
 makeOperator :: String -> Int -> Ast.Entity -> Setup ()
 makeOperator name precedence target = do
     modify (& operatorPrecedences %~ Map.insert name precedence)
-    modify (& globalScope . Context.nameMapping %~ Map.insert name (Ast.idOf target))
+    exposeEntity target name

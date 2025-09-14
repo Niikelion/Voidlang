@@ -6,7 +6,8 @@ comment "/*" "*/";
 Void.           Code            ::= [TopDef];
 
 separator nonempty TopDef "";
-FunDef.         TopDef          ::= "fun" Ident "(" [ArgumentDef] ")" ":" Type FunBody;
+FunDef.         TopDef          ::= "fun" Ident "(" [ArgumentDef] ")" OptType FunBody;
+VarDef.         TopDef          ::= "var" Ident OptType "=" Exp;
 
 separator ArgumentDef ",";
 ArgDef.         ArgumentDef     ::= Ident ":" Type;
@@ -14,25 +15,27 @@ ArgDef.         ArgumentDef     ::= Ident ":" Type;
 BlockBody.      FunBody         ::= StmtBlock;
 ExpBody.        FunBody         ::= "=>" Stmt;
 
-separator ArgType ",";
-AType.          ArgType       ::= Type;
+JType.          OptType         ::= ":" Type;
+NType.          OptType         ::= ;
 
-separator nonempty Type ",";
+separator Type ",";
 
 _.              Type            ::= Type1;
 _.              Type1           ::= Type2;
 _.              Type2           ::= Type3;
-_.              Type3           ::= Type4;
+
+TFunc.          Type            ::= Type1 "->" Type;
+TUnion.         Type1           ::= Type2 "|" Type;
+TArray.         Type2           ::= Type2 "[]";
+TOptional.      Type2           ::= Type2 "?";
+TPointer.       Type2           ::= Type2 "*";
+TShared.        Type2           ::= Type2 "@";
 TBool.          Type3           ::= "bool";
 TInt.           Type3           ::= "int";
 TString.        Type3           ::= "string";
 TVoid.          Type3           ::= "void";
 TNamed.         Type3           ::= Ident;
-TArray.         Type2           ::= Type2 "[]";
-TUnion.         Type            ::= Type2 "|" Type;
-TFunc.          Type1           ::= Type4 "->" Type;
-TOptional.      Type1           ::= Type2 "?";
-TTuple.         Type4           ::= "(" [Type] ")";
+TTuple.         Type3           ::= "(" [Type] ")";
 
 Block.          StmtBlock       ::= "{" [Stmt] "}";
 
@@ -40,9 +43,24 @@ Block.          StmtBlock       ::= "{" [Stmt] "}";
 (:).            [Stmt]          ::= Stmt "\n" [Stmt];
 (:).            [Stmt]          ::= Stmt ";" [Stmt];
 SBlock.         Stmt            ::= StmtBlock;
-SReturn.        Stmt            ::= "return" Exp;
-SVoidReturn.    Stmt            ::= "return";
+SReturn.        Stmt            ::= "return" OptExp;
 SExp.           Stmt            ::= Exp;
+SIf.            Stmt            ::= "if" "(" Exp ")" Stmt OptElse;
+SWhile.         Stmt            ::= "while" "(" Exp ")" Stmt;
+SDoWhile.       Stmt            ::= "do" Stmt "while" "(" Exp ")";
+Match.          Stmt            ::= "match" Exp "{" [WithExp] "}";
+
+JElse.          OptElse         ::= "else" Stmt;
+NElse.          OptElse         ::= ;
+
+separator WithExp "";
+IsCase.         WithExp         ::= "with" Pattern "=>" Stmt;
+OtherCase.      WithExp         ::= "else" Stmt;
+
+EPattern.       Pattern         ::= Exp;
+
+JExp.           OptExp          ::= Exp;
+NExp.           OptExp          ::= ;
 
 separator nonempty Exp ",";
 
@@ -55,10 +73,14 @@ EString.        Exp3            ::= String;
 ETrue.          Exp3            ::= "true";
 EFalse.         Exp3            ::= "false";
 EVar.           Exp3            ::= Ident;
-ECall.          Exp2            ::= Exp2 Exp4;
+ECall.          Exp2            ::= Exp2 "(" [Arg] ")";
 EBinOp.         Exp             ::= Exp1 Op Exp;
 EPrefOp.        Exp1            ::= Op Exp1;
 EPostOp.        Exp             ::= Exp1 Op;
 ETuple.         Exp4            ::= "(" [Exp] ")";
+
+separator Arg ",";
+
+EArg.           Arg             ::= Exp;
 
 token Op ["<>=/^&%$!|-+*"]+;

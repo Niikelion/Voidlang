@@ -5,12 +5,10 @@ import System.IO
 import qualified Void.Parser
 import qualified Void.Analyse
 import qualified Void.Compile
-import qualified Void.IR as IR
 import Control.Monad
 import Control.Monad.State(MonadTrans(..))
 import Control.Monad.Except
-import qualified Void.Analyse.Setup as Setup
-import Void.Ast
+import Void.Setup
 import Void.Platform
 import System.FilePath((<.>))
 
@@ -68,28 +66,15 @@ opts = (,) <$> argsParser <*> commandsParser <**> helper
 printInfo :: String -> ExceptT String IO ()
 printInfo = lift . putStrLn
 
-setup :: Setup.Setup ()
-setup = do
-    let plusSig = TFunction TInt [TInt, TInt]
-    addition <- Setup.makeEntity $ \i -> EExternal ("$plus" ++ mangle plusSig, i) plusSig
-    Setup.implementFunction addition [ IR.Block 0 [
-            IR.IAssign 2 $ IR.EOp IR.Plus (IR.VLocal IR.intType 0) (IR.VLocal IR.intType 1),
-            IR.IRet $ Just $ IR.VLocal IR.intType 2
-        ] ]
-    Setup.makeOperator "+" 5 addition
-
-initialState :: Setup.SetupState
-initialState = Setup.execSetup setup
-
 readCodeFile :: String -> ExceptT String IO Void.Parser.Code
 readCodeFile file = do
     content <- lift $ readFile file
     Void.Parser.parseCode content
 
-analyseModule :: Void.Parser.Code -> ExceptT String IO Void.Analyse.Module
+analyseModule :: Void.Parser.Code -> ExceptT String IO Void.Analyse.Module'
 analyseModule = (flip Void.Analyse.moduleFromCode) initialState
 
-compileModule :: Void.Analyse.Module -> ExceptT String IO String
+compileModule :: Void.Analyse.Module' -> ExceptT String IO String
 compileModule = return . show . (Void.Compile.compileModule initialState)
 
 runCommand :: Args -> Command -> IO ()

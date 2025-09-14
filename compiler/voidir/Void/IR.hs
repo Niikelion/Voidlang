@@ -4,6 +4,7 @@ module Void.IR where
 import Data.List
 import Prelude hiding (exp, id)
 import Data.Generics.Uniplate.Direct(Uniplate(..), Biplate(..), plate, (|-), (|*), (||*), (|+))
+import Data.Generics.Uniplate.Operations(transformBi)
 
 type FunName = String
 type Loc = Int
@@ -371,3 +372,9 @@ instance Show Module where
 
 secondM :: Monad m => (b -> m b') -> (a, b) -> m (a, b')
 secondM f (a, b) = f b >>= return . (a,)
+
+fixBlocks :: [Block] -> [Block]
+fixBlocks = reverse . (map $ transformBi reverseInstrs)
+    where
+        reverseInstrs :: [Instr] -> [Instr]
+        reverseInstrs = reverse

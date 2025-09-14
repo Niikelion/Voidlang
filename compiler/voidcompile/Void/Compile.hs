@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Void.Compile(compileModule) where
 
 import qualified Void.Ast as Ast
@@ -5,31 +6,55 @@ import qualified Void.IR as IR
 import qualified Void.Analyse as Analyser
 import qualified Void.Analyse.Setup as Setup
 import qualified Data.Map as Map
-import Control.Monad.Identity
 import Control.Monad.State
+import Control.Monad
 import Void.Trans
-import Data.Generics.Uniplate.Operations (transformBi)
+import Control.Lens.TH
+import Control.Lens hiding ((<|), at)
+import Data.Generics.Uniplate.Operations(transformBi)
+import Control.Monad.Reader hiding (local)
+
+data EmitState = EmitState {
+    _idMapping :: Map.Map Int Int, -- global -> local
+    _nextVarId :: Int,
+    _nextBlockId :: Int,
+    _emittedBlocks :: [IR.Block]
+}
+makeLenses ''EmitState
+
+type EntityMap = Map.Map Int Ast.Entity
+
+liftGlobal :: GlobalEmit a -> Emit a
+liftGlobal = lift
+
+liftBlock :: State IR.Block a -> Emit a
+liftBlock m = liftLocal $ state $ \s -> case s^.emittedBlocks of
+        [] -> (evalState m $ IR.Block 0 [], s)
+        h:t -> let (r, h') = runState m h in (r, s & emittedBlocks .~ h':t )
+
+liftLocal :: State EmitState a -> Emit a
+liftLocal m = StateT (return . (runState m))
+
+type GlobalEmit a = Reader EntityMap a
+type Emit a = StateT EmitState (Reader EntityMap) a
+
+emptyEmitState :: EmitState
+emptyEmitState = EmitState Map.empty 0 1 [ IR.Block 0 [] ]
+
+runEmit :: EmitState -> Emit a -> GlobalEmit (a, EmitState)
+runEmit s m = runStateT m s
 
 globalName :: Ast.Entity -> String
 globalName e@(Ast.EExternal {}) = Ast.nameOf e
 globalName (Ast.EFunction ("main", _) _ _ _) = "main"
 globalName e = (Ast.nameOf e) ++ "$" ++ (Ast.mangle $ Ast.typeOf e)
 
-fixBlocks :: [IR.Block] -> [IR.Block]
-fixBlocks = reverse . (map $ transformBi reverseInstrs)
-    where
-        reverseInstrs :: [IR.Instr] -> [IR.Instr]
-        reverseInstrs = reverse
-
-compileModule :: Setup.SetupState -> Analyser.Module -> IR.Module
+compileModule :: Setup.SetupState -> Analyser.Module' -> IR.Module
 compileModule s (Analyser.Code entities) = IR.Module definitions
     where
         entityList = map snd $ Map.toList entities
-        runGlobal = (flip evalState $ GlobalEmitState entities) . runGlobalEmitT
+        runGlobal = (flip runReader entities)
         definitions = runGlobal $ emitEntities (Setup._implementations s) entityList
-
-type GlobalEmit a = GlobalEmitT Identity a
-type Emit m a = LocalEmitT (GlobalEmitT m) a
 
 emitEntities :: Map.Map Int IR.Def -> [Ast.Entity] -> GlobalEmit [IR.Def]
 emitEntities impls = mapM $ \e -> maybe (emitEntity e) return $ Map.lookup (Ast.idOf e) impls
@@ -39,7 +64,7 @@ emitEntity e@(Ast.EFunction _ ret args stmt) = do
     let ret' = IR.typeOf ret
     let argTypes = map (IR.typeOf . Ast.typeOf) args
     let sig = IR.Fun ret' argTypes
-    (args', resultState) <- runLocal $ do
+    (args', resultState) <- runEmit emptyEmitState $ do
         args' <- mapM (\arg -> do
                 freshId <- freshLocalEntityId
                 insertGlobalLocalMapping (Ast.idOf arg) freshId
@@ -49,109 +74,89 @@ emitEntity e@(Ast.EFunction _ ret args stmt) = do
         startLocalBlock blockId
         emitStatement stmt
         return args'
-    let blocks = fixBlocks $ localBlocks resultState
-    return $ IR.FunDef sig args' (globalName e) $ ensureSSA [0..argCount-1] blocks
-    where
-        argCount = length args
-        runLocal = (flip runStateT $ emptyLocalState 0) . runLocalEmitT
+    let blocks = IR.fixBlocks $ resultState^.emittedBlocks
+    return $ IR.FunDef sig args' (globalName e) $ ensureSSA [0..length args-1] blocks
 emitEntity e@(Ast.EExternal _ t) = return $ IR.ExtDef (IR.typeOf t) $ Ast.nameOf e
 emitEntity _ = error "entities other than functions not supported"
 
-emitStatement :: Monad m => Ast.Statement -> Emit m ()
+emitStatement :: Ast.Statement -> Emit ()
 emitStatement (Ast.SBlock stmts _) = mapM_ emitStatement stmts
 emitStatement (Ast.SReturn (Just e)) = do
     result <- emitExpression e
-    ir [ IR.IRet $ Just result ]
-emitStatement (Ast.SReturn Nothing) = ir [ IR.IRet Nothing ]
+    ir $ IR.IRet $ Just result
+emitStatement (Ast.SReturn Nothing) = ir $ IR.IRet Nothing
 emitStatement (Ast.SExpression e) = do
-    _ <- emitExpression e
+    void $ emitExpression e
     return ()
+emitStatement (Ast.SIf e t Nothing) = do
+    cond <- emitExpression e
+    trueBranchId <- freshLocalBlockId
+    targetBlockId <- freshLocalBlockId
+    ir $ IR.ICond cond trueBranchId targetBlockId
+    startLocalBlock trueBranchId
+    emitStatement t
+    needsJump <- liftBlock $ gets IR.blockJumpTargets <&> null
+    when needsJump $ ir $ IR.IJump targetBlockId
+    startLocalBlock targetBlockId
+emitStatement (Ast.SIf e t (Just f)) = do
+    cond <- emitExpression e
+    trueBranchId <- freshLocalBlockId
+    falseBranchId <- freshLocalBlockId
+    targetBlockId <- freshLocalBlockId
+    ir $ IR.ICond cond trueBranchId falseBranchId
+    startLocalBlock trueBranchId
+    emitStatement t
+    trueNeedsJump <- liftBlock $ gets IR.blockJumpTargets <&> null
+    when trueNeedsJump $ ir $ IR.IJump targetBlockId
+    startLocalBlock falseBranchId
+    emitStatement f
+    falseNeedsJump <- liftBlock $ gets IR.blockJumpTargets <&> null
+    when falseNeedsJump $ ir $ IR.IJump targetBlockId
+    startLocalBlock targetBlockId
 
-emitExpression :: Monad m => Ast.Expression -> Emit m (IR.Val)
+emitExpression :: Ast.Expression -> Emit (IR.Val)
 emitExpression (Ast.EBool v) = return $ IR.bool v
 emitExpression (Ast.EInt v) = return $ IR.int v
 emitExpression (Ast.EString _) = error "string expressions not supported"
 emitExpression (Ast.ENamed (_, targetId) t) = do
     let t' = IR.typeOf t
     findGlobalEntity targetId >>= \e -> case e of
-        Nothing -> mapGlobalToLocal targetId >>= return . (IR.VLocal t')
+        Nothing -> mapGlobalToLocal targetId <&> IR.VLocal t'
         Just e' -> return $ IR.VGlobal t' $ globalName e'
 emitExpression (Ast.ECall target args) = do
     target' <- emitExpression target
     args' <- mapM emitExpression args
     freshId <- freshLocalEntityId
     let callE = IR.ECall (IR.typeOf target') target' args'
-    ir [ IR.IAssign freshId callE ]
+    ir $ IR.IAssign freshId callE
     return $ IR.VLocal (IR.typeOf callE) freshId
 
-ir :: Monad m => [IR.Instr] -> Emit m ()
-ir instrs = modifyLocalState $ \s -> s { localBlocks = insertToTop $ localBlocks s }
+ir :: IR.Instr -> Emit ()
+ir instr = liftLocal $ modify (& emittedBlocks %~ insertToTop)
     where
         insertToTop :: [IR.Block] -> [IR.Block]
         insertToTop [] = error "cannot insert instruction when no block is present"
-        insertToTop (h:t) = ((flip transformBi) h $ ((reverse instrs) ++)):t
+        insertToTop (h:t) = ((flip transformBi) h (instr :)):t
 
-findGlobalEntity :: Monad m => Ast.EntityId -> Emit m (Maybe Ast.Entity)
-findGlobalEntity entityId = globalState $ \s -> Map.lookup entityId $ entities s
+findGlobalEntity :: Ast.EntityId -> Emit (Maybe Ast.Entity)
+findGlobalEntity entityId = liftGlobal ask <&> Map.lookup entityId
 
-globalState :: Monad m => (GlobalEmitState -> a) -> Emit m a
-globalState = lift . GlobalEmitT . gets
-
-startLocalBlock :: Monad m => Int -> Emit m ()
+startLocalBlock :: Int -> Emit ()
 startLocalBlock blockId = pushLocalBlock $ IR.Block blockId []
 
-pushLocalBlock :: Monad m => IR.Block -> Emit m ()
-pushLocalBlock block = modifyLocalState $ \s -> s { localBlocks = block : localBlocks s }
+pushLocalBlock :: IR.Block -> Emit ()
+pushLocalBlock b = liftLocal $ emittedBlocks %= (b:)
 
-freshLocalEntityId :: Monad m => Emit m Int
-freshLocalEntityId = localState $ \s ->
-        let n = nextLocalEntityId s in (n, s { nextLocalEntityId = n + 1 })
+freshLocalEntityId :: Emit Int
+freshLocalEntityId = liftLocal $ nextVarId <<+= 1
 
-freshLocalBlockId :: Monad m => Emit m Int
-freshLocalBlockId = localState $ \s ->
-        let n = nextLocalBlockId s in (n, s { nextLocalBlockId = n + 1 })
+freshLocalBlockId :: Emit Int
+freshLocalBlockId = liftLocal $ nextBlockId <<+= 1
 
-mapGlobalToLocal :: Monad m => Ast.EntityId -> Emit m Int
+mapGlobalToLocal :: Ast.EntityId -> Emit Int
 mapGlobalToLocal entityId = do
-    result <- getLocalState $ \s -> Map.lookup entityId $ globalLocalMapping s
-    case result of
-        Nothing -> error "internal error, missing global -> local mapping"
-        Just localId -> return localId
+    result <- liftLocal (use idMapping) <&> Map.lookup entityId
+    maybe (error "internal error, missing global -> local mapping") return result
 
-insertGlobalLocalMapping :: Monad m => Ast.EntityId -> Int -> Emit m ()
-insertGlobalLocalMapping entityId localId = modifyLocalState $ \s -> s {
-        globalLocalMapping = Map.insert entityId localId $ globalLocalMapping s
-    }
-
-getLocalState :: Monad m => (LocalEmitState -> a) -> Emit m a
-getLocalState f = localState $ \s -> (f s, s)
-
-modifyLocalState :: Monad m => (LocalEmitState -> LocalEmitState) -> Emit m ()
-modifyLocalState f = localState $ \s -> ((), f s)
-
-localState :: Monad m => (LocalEmitState -> (a, LocalEmitState)) -> Emit m a
-localState = LocalEmitT . state
-
-data LocalEmitState = LocalEmitState {
-    globalLocalMapping :: Map.Map Ast.EntityId Int,
-    nextLocalEntityId :: Int,
-    nextLocalBlockId :: Int,
-    localBlocks :: [IR.Block]
-}
-
-emptyLocalState :: Int -> LocalEmitState
-emptyLocalState argCount = LocalEmitState Map.empty argCount 0 []
-
-newtype LocalEmitT m a = LocalEmitT {
-    runLocalEmitT :: StateT LocalEmitState m a
-} deriving (Functor, Applicative, Monad)
-instance MonadTrans LocalEmitT where lift = LocalEmitT . lift
-
-data GlobalEmitState = GlobalEmitState {
-    entities :: Map.Map Ast.EntityId Ast.Entity
-}
-
-newtype GlobalEmitT m a = GlobalEmitT {
-    runGlobalEmitT :: StateT GlobalEmitState m a
-} deriving (Functor, Applicative, Monad)
-instance MonadTrans GlobalEmitT where lift = GlobalEmitT . lift
+insertGlobalLocalMapping :: Ast.EntityId -> Int -> Emit ()
+insertGlobalLocalMapping entityId localId = liftLocal $ idMapping %= Map.insert entityId localId

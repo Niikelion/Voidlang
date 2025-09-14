@@ -1,0 +1,5 @@
+fun main():void {
+    putchar(33)
+    putchar(33)
+    putchar(33)
+}

@@ -1,6 +1,13 @@
 fun foo(n: int): int => n + 1
 
+fun p(ex: bool): void {
+    if (ex) putchar(33)
+    else putchar(36)
+}
+
 fun main(): void
 {
     foo(5)
+    p(true)
+    p(false)
 }
