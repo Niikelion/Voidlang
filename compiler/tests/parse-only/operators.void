@@ -1,0 +1,5 @@
+inline fun or(a: bool, b: lazy bool): bool => if a then true else b
+[Infixr(1)] operator (||) or
+
+inline fun and(a: bool, b: lazy bool): bool => if !a then false else b
+[Infixr(1)] operator (&&) and

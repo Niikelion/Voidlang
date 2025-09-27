@@ -3,11 +3,33 @@ entrypoints Code;
 comment "//";
 comment "/*" "*/";
 
-Void.           Code            ::= [TopDef];
+Void.           Code            ::= [TopDefinition];
 
-separator nonempty TopDef "";
-FunDef.         TopDef          ::= "fun" Ident "(" [ArgumentDef] ")" OptType FunBody;
-VarDef.         TopDef          ::= "var" Ident OptType "=" Exp;
+separator nonempty TopDefinition "";
+
+TopDef.         TopDefinition   ::= VisSpec Def;
+
+FunDef.         Def             ::= "fun" Ident "(" [ArgumentDef] ")" OptType FunBody;
+VarDef.         Def             ::= VarSpec Ident OptType "=" Exp;
+TraitDef.       Def             ::= "trait" Ident TraitArgs TraitBody;
+
+NTraitArgs.     TraitArgs       ::= ;
+JTraitArgs.     TraitArgs       ::= "(" [TraitArg] ")";
+
+separator TraitArg ",";
+FullTraitArg.   TraitArg        ::= Ident TraitArgCon;
+
+separator Ident ",";
+
+NTraitArgCon.   TraitArgCon     ::= ;
+JTraitArgCon.   TraitArgCon     ::= ":" [Ident];
+
+PubSpec.        VisSpec         ::= "public";
+PrivSpec.       VisSpec         ::= "private";
+DefSpec.        VisSpec         ::= ;
+
+MutSpec.        VarSpec         ::= "var";
+ConSpec.        VarSpec         ::= "val";
 
 separator ArgumentDef ",";
 ArgDef.         ArgumentDef     ::= Ident ":" Type;
@@ -24,9 +46,13 @@ _.              Type            ::= Type1;
 _.              Type1           ::= Type2;
 _.              Type2           ::= Type3;
 
+separator Comma "";
+CComma.         Comma           ::= ",";
+
+TTrait.         Type            ::= Type1 "(" [Type] ")";
 TFunc.          Type            ::= Type1 "->" Type;
 TUnion.         Type1           ::= Type2 "|" Type;
-TArray.         Type2           ::= Type2 "[]";
+TArray.         Type2           ::= Type2 "[" [Comma] "]";
 TOptional.      Type2           ::= Type2 "?";
 TPointer.       Type2           ::= Type2 "*";
 TShared.        Type2           ::= Type2 "@";
@@ -67,20 +93,37 @@ separator nonempty Exp ",";
 _.              Exp             ::= Exp1;
 _.              Exp1            ::= Exp2;
 _.              Exp2            ::= Exp3;
-_.              Exp3            ::= Exp4;
+
+EBinOp.         Exp             ::= Exp1 Op Exp;
+EPostOp.        Exp             ::= Exp1 Op;
+
+EPrefOp.        Exp1            ::= Op Exp1;
+EIs.            Exp1            ::= Exp2 "is" Pattern;
+
+ECall.          Exp2            ::= Exp2 "(" [ArgVal] ")";
+EMember.        Exp2            ::= Exp2 "." Ident;
+EElem.          Exp2            ::= Exp2 "[" [Exp] "]";
+
 EInt.           Exp3            ::= Integer;
-EString.        Exp3            ::= String;
+EString.        Exp3            ::= "\"" [StringChunk] "\"";
 ETrue.          Exp3            ::= "true";
 EFalse.         Exp3            ::= "false";
+EVoid.          Exp3            ::= "void";
 EVar.           Exp3            ::= Ident;
-ECall.          Exp2            ::= Exp2 "(" [Arg] ")";
-EBinOp.         Exp             ::= Exp1 Op Exp;
-EPrefOp.        Exp1            ::= Op Exp1;
-EPostOp.        Exp             ::= Exp1 Op;
-ETuple.         Exp4            ::= "(" [Exp] ")";
+ETuple.         Exp3            ::= "(" [Exp] ")";
 
-separator Arg ",";
+separator ArgVal ",";
 
-EArg.           Arg             ::= Exp;
+PosArg.         ArgVal          ::= Exp;
+NamedArg.       ArgVal          ::= Ident "=" Exp;
 
-token Op ["<>=/^&%$!|-+*"]+;
+separator StringChunk "";
+
+SRaw.           StringChunk     ::= StringText;
+SEscape.        StringChunk     ::= EscapeSeq;
+SInterp.        StringChunk     ::= "{" Exp "}";
+
+token StringText (char - ["\"\\{}"])+;
+token EscapeSeq ({"\\\\"} ["ntr\"\\"]);
+
+token Op ["<>=/^&%$!|-+*@"]+;

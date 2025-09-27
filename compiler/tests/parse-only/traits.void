@@ -1,0 +1,94 @@
+// --- basic traits ---
+
+trait Plus(A, B, R) {
+    fun plus(this: A, b: B): R
+}
+
+/* with explicit in/out:
+trait Plus(in A, in B, out R) {
+    fun plus(this: A, b: B): R
+}
+*/
+
+[Infixl(5)] operator (+) Plus.plus;
+
+trait Equal(T) {
+    fun eq(this: T, b: T): bool
+}
+
+[Infix] operator (==) Equal.eq
+
+// --- class traits & implicit trait implementations ---
+
+trait ToString(T) {
+    fun toString(this: T): string
+}
+
+/* with class trait:
+trait class ToString {
+    fun toString(): string
+}
+*/
+
+class Foo: ToString
+{
+    private val a: Int;
+
+    fun toString() => "Foo(" + a.toString() + ")"
+}
+
+/* without explicit trait implementation:
+class Foo
+{
+    private val a: Int;
+    fun toString() => "Foo(" + a.toString() + ")"
+}
+
+implement ToString(Foo) {
+    fun toString(this: Foo) => this.toString()
+}
+*/
+
+// --- default trait implementations ---
+
+trait NotEqual(T) {
+    fun neq(this: T, b: T): bool
+}
+
+[Infix] operator (!=) NotEqual.neq
+
+infer Equal(T) => NotEqual(T) {
+    fun neq(this: T, b: T) => !this.eq(b)
+}
+
+infer NotEqual(T) => Equal(T) {
+    fun eq(this: T, b: T) => !this.neq(b)
+}
+
+infer (Equal(T), Less(T)) => Ordered(T) {
+    fun compare(a: T, b: T) => match a {
+        with _ == b => Same
+        with _ < b  => Lower
+        with _ > b  => Higher
+    }
+} 
+
+// --- trait inheritance ---
+
+trait class File(T): Stream(T) {
+    fun getFilename(): string
+}
+
+// --- variadic traits ---
+
+trait class Callable(R, ...Args) {
+    fun call(...args: Args): R
+}
+
+trait class HasFirst(T) {
+    fun getFirst(): T
+}
+
+infer ((A, ...Rest) as T) => HasFirst(T) {
+    fun getFirst(this: T) => match this with (a, ..._) => a
+}
