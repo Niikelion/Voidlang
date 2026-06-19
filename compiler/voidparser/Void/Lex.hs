@@ -5,7 +5,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LINE 4 "voidparser/Void/Lex.x" #-}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
+{-# OPTIONS -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -w #-}
 
 {-# LANGUAGE PatternSynonyms #-}
@@ -20,6 +20,7 @@ import Data.Function (on)
 import Data.Word     (Word8)
 #include "ghcconfig.h"
 import qualified Data.Array
+import qualified Data.Char
 import Data.Array.Base (unsafeAt)
 import GHC.Exts (Addr#,Int#,Int(I#),(*#),(+#),(-#),(==#),(>=#),indexCharOffAddr#,indexInt16OffAddr#,indexInt32OffAddr#,int2Word#,narrow16Int#,narrow32Int#,negateInt#,or#,ord#,uncheckedShiftL#,word2Int#)
 import qualified GHC.Exts
@@ -128,12 +129,16 @@ alex_action_7 = tok TI
 #  define FAST_INT Int#
 -- Do not remove this comment. Required to fix CPP parsing when using GCC and a clang-compiled alex.
 #  if __GLASGOW_HASKELL__ > 706
-#    define GTE(n,m) (GHC.Exts.tagToEnum# (n >=# m))
-#    define EQ(n,m) (GHC.Exts.tagToEnum# (n ==# m))
+#    define CMP_GEQ(n,m) (((n) >=# (m)) :: Int#)
+#    define CMP_EQ(n,m) (((n) ==# (m)) :: Int#)
+#    define CMP_MKBOOL(x) ((GHC.Exts.tagToEnum# (x)) :: Bool)
 #  else
-#    define GTE(n,m) (n >=# m)
-#    define EQ(n,m) (n ==# m)
+#    define CMP_GEQ(n,m) (((n) >= (m)) :: Bool)
+#    define CMP_EQ(n,m) (((n) == (m)) :: Bool)
+#    define CMP_MKBOOL(x) ((x) :: Bool)
 #  endif
+#  define GTE(n,m) CMP_MKBOOL(CMP_GEQ(n,m))
+#  define EQ(n,m) CMP_MKBOOL(CMP_EQ(n,m))
 #  define PLUS(n,m) (n +# m)
 #  define MINUS(n,m) (n -# m)
 #  define TIMES(n,m) (n *# m)
@@ -257,7 +262,7 @@ alex_scan_tkn user__ orig_input len input__ s last_acc =
      Nothing -> (new_acc, input__)
      Just (c, new_input) ->
 #ifdef ALEX_DEBUG
-      Debug.Trace.trace ("State: " ++ show IBOX(s) ++ ", char: " ++ show c ++ " " ++ (show . chr . fromIntegral) c) $
+      Debug.Trace.trace ("State: " ++ show IBOX(s) ++ ", char: " ++ show c ++ " " ++ (show . Data.Char.chr . fromIntegral) c) $
 #endif
       case fromIntegral c of { IBOX(ord_c) ->
         let

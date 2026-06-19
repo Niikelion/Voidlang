@@ -8,7 +8,7 @@
 {-# LANGUAGE NoStrictData #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns -fno-warn-overlapping-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns -Wno-overlapping-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module Void.Par
